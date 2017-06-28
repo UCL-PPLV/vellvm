@@ -17,6 +17,7 @@ Require Import List Bool String Utf8.
 Export ListNotations.
 From Coq.Program Require Export Basics Syntax.
 
+Arguments String.append _ _ : simpl never.
 
 Notation "t $ r" := (t r)
   (at level 65, right associativity, only parsing).
@@ -198,6 +199,9 @@ Class Monad F `{Functor F} :=
   mbind : forall {A B}, F A -> (A -> F B) -> F B ;
 }.
 
+Hint Unfold mret.
+Hint Unfold mbind.
+
 Notation "m ≫= f"  := (mbind m f) (at level 60, right associativity).
 Notation "( m ≫=)" := (mbind m) (only parsing).
 Notation "(≫= f )" := (fun m => mbind m f) (only parsing).
@@ -300,6 +304,8 @@ Definition sum_map {X A B} (f : A -> B) (s:X + A) : X + B :=
   | inl x => inl x
   | inr a => inr (f a)
   end.
+Hint Unfold sum_map.
+Arguments sum_map _ _ : simpl nomatch.
 
 Instance sum_functor {X:Type} : @Functor (sum X) := (@sum_map X).
 Instance sum_functor_eq_laws {X:Type} : (@FunctorLaws(sum X)) sum_functor (@eq).
@@ -362,8 +368,11 @@ Definition st_map {M A B} (f : A -> B) (s : ST M A) : ST M B :=
   fun (m:M) =>
     let (m', x) := s m in (m', f x).
 Definition st_ret {M A} : A -> ST M A := fun (x:A) => fun (m: M) => (m, x).
+Hint Unfold st_ret.
+
 Definition st_bind {M A B} : (ST M A) -> (A -> ST M B) -> ST M B :=
   fun s => fun f => fun m => let (m', x) := s m in f x m'.            
+Hint Unfold st_bind.
 
 Instance st_functor {M} : (@Functor (ST M)) := (@st_map M).
 Instance st_functor_eq_laws {M} `{Equiv M} : (@FunctorLaws (ST M)) st_functor (@eq).
@@ -392,7 +401,7 @@ Defined.
 Program Instance st_monad_eq_laws : forall A, (@MonadLaws (ST A)) st_functor _ _ _ _.
 Next Obligation.
   apply functional_extensionality.
-  intros x.  destruct (a x). reflexivity.
+  intros x. simpl. destruct (a x). reflexivity.
 Defined.
 Next Obligation.
   apply functional_extensionality.
@@ -414,8 +423,12 @@ Definition trywith {A:Type} {F} `{ExceptionMonad string F} (s:string) (o:option 
     | Some x => mret x
     | None => raise s
     end.
+Hint Unfold trywith.
+Arguments trywith _ _ : simpl nomatch.
 
 Definition failwith {A:Type} {F} `{ExceptionMonad string F} (s:string) : F A := raise s.
+Hint Unfold failwith.
+Arguments failwith _ _ : simpl nomatch.
 
 (* Monad operations *)
 
@@ -482,14 +495,6 @@ Fixpoint to_string_b10' fuel (x:Z) : string :=
   end.
 
 (* Definition to_string_b10 := to_string_b10' 10. *)
-Definition to_string_b10 := to_string_b10' 1000.
+Definition to_string_b10 := to_string_b10' 10000.
 
 Instance string_of_Z : StringOf Z := to_string_b10.
-
-
-
-
-
-
-
-

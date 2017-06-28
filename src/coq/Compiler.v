@@ -10,11 +10,25 @@
 
 Require Import ZArith String Omega List Equalities MSets.
 
+(* CompCert *)
+Require Import compcert.lib.Integers.
+
 (* Vellvm dependencies *)
 Require Import Vellvm.Classes Vellvm.Ollvm_ast Vellvm.AstLib.
 
 (* Logical Foundations dependencies *)
 Require Import Vellvm.Imp Vellvm.Maps.
+
+(* Setup for 1bit integers *)
+Module Wordsize1.
+  Definition wordsize := 1%nat.
+  Remark wordsize_not_zero: wordsize <> 0%nat.
+  Proof. unfold wordsize; congruence. Qed.
+End Wordsize1.
+
+Module Int1 := Make(Wordsize1).
+
+Definition int1 := Int1.int.
 
 (* "Flattened" representation of Vellvm code *)
 Inductive elt :=
@@ -31,6 +45,7 @@ Instance string_of_elt : StringOf elt :=
     | T id t => ("Terminator " ++ (string_of id) ++ ": " ++ (string_of t))%string
     end.
 
+
 Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list block) :=
   '(insns, term_opt, blks) <-
    monad_fold_right
@@ -39,10 +54,10 @@ Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list blo
       | L l =>
         match term_opt with
         | None => 
-          if (List.length insns) == 0 then mret ([], None, blks)
+          if (List.length insns) == 0%nat then mret ([], None, blks)
           else failwith "terminator not found"
-        | Some (id, t) =>
-          mret ([], None, (mk_block l insns t id)::blks)
+        | Some tm =>
+          mret ([], None, (mk_block l [] insns tm)::blks)
         end
       | T id t  => mret ([], Some (id, t), blks)
       | I uid insn => mret ((uid,insn)::insns, term_opt, blks)
@@ -51,8 +66,8 @@ Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list blo
   ;
     match term_opt with
     | None => failwith "terminator not found"
-    | Some (id, t) =>
-      mret ((mk_block entry_label insns t id) :: blks)
+    | Some tm =>
+      mret ((mk_block entry_label [] insns tm) :: blks)
     end.
 
 
@@ -95,7 +110,7 @@ Fixpoint fv_bexp (b:bexp) : IDSet.t :=
   | BLe a1 a2 => IDSet.union (fv a1) (fv a2)
   | BNot b => fv_bexp b
   | BAnd b1 b2 => IDSet.union (fv_bexp b1) (fv_bexp b2)
-  end.
+  end. 
 Instance FV_bexp : FV bexp := fv_bexp.
 
 Fixpoint fv_com (c:com) : IDSet.t :=
@@ -107,7 +122,6 @@ Fixpoint fv_com (c:com) : IDSet.t :=
   | CWhile b c => IDSet.union (fv b) (fv_com c)
   end.
 Instance FV_com : FV com := fv_com.
-
 
 (* LLVM Identifier generation monad ----------------------------------------- *)
 
@@ -125,6 +139,8 @@ Instance llvm_functor : @Functor LLVM := llvm_map.
 
 Definition llvm_ret (A:Type) (x:A) : LLVM A :=
   fun s => (s, inr x).
+Hint Unfold llvm_ret.
+
 
 Definition llvm_bind (A B:Type) (g:LLVM A) (f:A -> LLVM B) : LLVM B :=
   fun s =>
@@ -133,6 +149,7 @@ Definition llvm_bind (A B:Type) (g:LLVM A) (f:A -> LLVM B) : LLVM B :=
     | inl e => (st, inl e)
     | inr a => (f a) st
     end.
+Hint Unfold llvm_bind.
 Program Instance llvm_monad : (@Monad LLVM) llvm_functor := _.
 Next Obligation.
   split.
@@ -141,6 +158,7 @@ Next Obligation.
 Defined.    
 
 Instance llvm_err : (@ExceptionMonad string LLVM _ _) := fun _ e => fun s => (s, inl e).
+Hint Unfold llvm_err.
 
 (* Start the counters at 1 so that 0 can be used at the toplevel *)
 Definition run {A} (g : LLVM A) : err (A * list elt) :=
@@ -152,14 +170,29 @@ Definition run {A} (g : LLVM A) : err (A * list elt) :=
 
 Definition lift {A} (e:string) (m:option A) : LLVM A :=
   fun s => (s, trywith e m).
+Hint Unfold lift.
 
-Definition lid_of_Z (n:int) : local_id := Name ("x"++(string_of n))%string.
+Definition lid_of_Z (n:int) : local_id := Raw n.
+
+Lemma lid_of_Z_inj: forall n1 n2, n1 <> n2 -> lid_of_Z n1 <> lid_of_Z n2.
+Proof.
+  intros. unfold lid_of_Z. unfold not. intros. apply H. inversion H0. reflexivity.
+Qed.
+
+Lemma lid_of_Z_inj2: forall n1 n2, lid_of_Z n1 = lid_of_Z n2 -> n1 = n2.
+Proof.
+  intros n1 n2 H.
+  inversion H.
+  reflexivity.
+Qed.  
 
 Definition genlabel : () -> LLVM (local_id) :=
   fun _ => fun '(n,m,c) => ((1+n,m,c), mret (lid_of_Z n))%Z.
+Hint Unfold genlabel.
 
 Definition genvoid : () -> LLVM (instr_id) :=
   fun _ => fun '(n,m,c) => ((n,1+m,c), mret (IVoid m))%Z.
+Hint Unfold genvoid.
 
 (* A context maps Imp variables to Vellvm identifiers
    Invariant: 
@@ -170,6 +203,12 @@ Definition ctxt := partial_map value.
 
 Definition val_of_nat (n:nat) : value :=
   SV (VALUE_Integer (Z.of_nat n)).
+
+Definition val_of_int64 (i:int64) : value :=
+  SV (VALUE_Integer (Int64.signed i)).
+
+Definition val_of_int1 (i:int1) : value :=
+  SV (VALUE_Integer (Int1.signed i)).
 
 Definition val_of_ident (id:ident) : value :=
   SV (VALUE_Ident id).
@@ -216,6 +255,8 @@ Definition label l : LLVM () :=
   fun '(n,m,c) => ((n,m,(L l)::c), mret ()).
 
 
+(*! Section Compiler *)
+
 (* Note: list of instructions in code is generated in reverse order *)
 Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
   let compile_binop (op:ibinop) (a1 a2:aexp) :=
@@ -225,8 +266,10 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
       mret (local lid)
   in
   match a with
-  | ANum n => mret (val_of_nat n)
-
+  | ANum n => (* TO SEE: mret (val_of_int64 n) *)
+    (*! *) 'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_nat 0);
+      mret (local lid)
+    (*! mret (val_of_int64 n) *)
   | AId x =>
     'ptr <- lift "AId ident not found" (g x);
     'lid <- load ptr;
@@ -236,7 +279,6 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
   | AMinus a1 a2 => compile_binop (Sub false false) a1 a2
   | AMult a1 a2  => compile_binop (Mul false false) a1 a2
   end.
-
     
 Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
   let compile_icmp (cmp:icmp) (a1 a2:aexp) :=
@@ -246,15 +288,18 @@ Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
       mret (local lid)
   in
   match b with
-  | BTrue     => mret (val_of_bool true)
-  | BFalse    => mret (val_of_bool false)
+  | BTrue     => 
+    'lid <- comp Eq (val_of_int64 (Int64.repr 0)) (val_of_int64 (Int64.repr 0));
+    mret (local lid)
+  | BFalse    => 
+    'lid <- comp Eq (val_of_int64 (Int64.repr 1)) (val_of_int64 (Int64.repr 0));
+    mret (local lid)
   | BEq a1 a2 => compile_icmp Eq a1 a2
-  | BLe a1 a2 => compile_icmp Ule a1 a2
-
+  | BLe a1 a2 => compile_icmp Sle a1 a2
   | BNot b =>
     'v <- compile_bexp g b;
-    'lid <- binop Xor i1 v (val_of_bool true);
-    mret (local lid)
+    'lid <- emit (INSTR_Op (SV (OP_ICmp Eq i1 (val_of_int1 (Int1.repr 0)) v)));
+    mret (local lid) 
 
   | BAnd b1 b2 =>
     'v1 <- compile_bexp g b1;
@@ -267,6 +312,7 @@ Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
 Fixpoint compile_com (g:ctxt) (c:com) : LLVM () :=
   match c with
   | CSkip => mret ()
+
   | CAss x a => 
     'v <- compile_aexp g a;
     'ptr <- lift "CAss ident not found" (g x);
@@ -314,7 +360,11 @@ Fixpoint compile_fv (l:list id) : LLVM ctxt :=
   | x::xs =>
     'g <- compile_fv xs;
     'uid <- alloca ();
-    '; store (val_of_nat 0) (local uid);
+    (* '; store (val_of_nat 0) (local uid); *)
+    (* CHKoh: is the following right? *)
+    'v <- compile_aexp g (ANum (Int64.repr 0%Z)); 
+    '; store v (local uid);
+      
     mret (update g x (local uid)) 
   end.
 
@@ -366,6 +416,7 @@ Definition print_decl (fn:string) : declaration :=
      dc_gc := None
   |}.
 
+
 Definition compile (c:com) : err (toplevel_entities (list block)) :=
   '(fvs, elts) <-
           run (
@@ -374,7 +425,7 @@ Definition compile (c:com) : err (toplevel_entities (list block)) :=
             '; compile_com g c; 
 (*            '; print_fv fvs g;  (* UNCOMMENT to enable imp state printing *) *)
             '; term TERM_Ret_void;    
-              mret fvs              
+            mret fvs
           );
   'blocks <- blocks_of_elts (Anon 0)%Z elts;
   mret
@@ -386,17 +437,3 @@ Definition compile (c:com) : err (toplevel_entities (list block)) :=
     df_args := [];
     df_instrs := blocks
   |}]).
-
-
-
-(* Testing infrastructure *)
-
-Definition compile_aexp_wrapper (a : aexp) :=
-  run (let fvs := IDSet.elements (fv a) in
-       'g <- compile_fv fvs;
-         compile_aexp g a).
-
-Definition compile_bexp_wrapper (b : bexp) :=
-  run (let fvs := IDSet.elements (fv b) in
-       'g <- compile_fv fvs;
-         compile_bexp g b).
