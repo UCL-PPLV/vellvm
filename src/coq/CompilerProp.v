@@ -46,7 +46,7 @@ Definition dvalue_of_nat (n:nat) : dvalue :=
   DV (VALUE_Integer (Z.of_nat n)).
 
 Definition dvalue_of_int64 (n: int64) : dvalue :=
-  (*!*) DVALUE_I64 n. (*!  DV (VALUE_Integer (Int64.unsigned n)). *)
+  (**!*) DVALUE_I64 n. (**!  DV (VALUE_Integer (Int64.unsigned n)). *)
 
 Definition imp_val_eqb (v1 v2 : dvalue) : bool :=
   match v1, v2 with
@@ -142,13 +142,14 @@ Fixpoint get_n_instrs_from_blocks (l : list block) (n : nat) : list block :=
   match l with 
   | [] => []
   | first_block :: rest =>
-    let instrs := List.firstn n (blk_instrs first_block) in
+    let instrs := List.firstn n (blk_code first_block) in
     let steps_left := (n - (List.length instrs))%nat in
     match steps_left with
     | O => [mk_block (blk_id first_block)
+                    (blk_phis first_block)
                     instrs
                     (blk_term first_block)
-                    (blk_term_id first_block)]
+                    ]
     | S n' =>
       first_block :: get_n_instrs_from_blocks rest steps_left 
     end
@@ -197,10 +198,11 @@ CoInductive FullTrace :=
 (* Insert state label as breadcrumbs *)
 CoFixpoint sem_all_visible (CFG : mcfg) (st : SS.state) : FullTrace :=
   match (stepD CFG st) with
-  | inl st' => FT_Tau st' (sem_all_visible CFG st')
-  | inr (Err s) => FT_Tau st (FT_Vis (Err s))
-  | inr (Fin s) => FT_Tau st (FT_Vis (Fin s))
-  | inr (Eff m) =>
+  | Step st' => FT_Tau st' (sem_all_visible CFG st')
+  | Jump st' => FT_Tau st' (sem_all_visible CFG st')                      
+  | Obs (Err s) => FT_Tau st (FT_Vis (Err s))
+  | Obs (Fin s) => FT_Tau st (FT_Vis (Fin s))
+  | Obs (Eff m) =>
     FT_Vis (Eff (
       match m with
       | Alloca t k =>
@@ -220,7 +222,7 @@ Fixpoint MemDFullTrace (m:memory) (d:FullTrace) (steps:nat) : err (SS.state * me
   | O =>
     match d with
     | FT_Tau st d' => inr (st, m) (* Expose results here *)
-    | _  => inl "Out of steps"
+    | _  => inl "More steps needed"
     end    
   | S x =>
     match d with
@@ -257,8 +259,23 @@ Fixpoint debug (c : com) (steps:nat) : err (SS.state * memory) :=
     end
   end.
 
-
-(*! Section CompilerProp *)
+Definition untrusted_run_eval_expr (c : com) (expr : Expr Ollvm_ast.value) :=
+  let fvs := IDSet.elements (fv c) in
+  match compile c with
+  | inl e => inl e
+  | inr ll_prog =>
+    let m := modul_of_toplevel_entities ll_prog in
+    match mcfg_of_modul m with
+    | None => inl "Compilation failed"
+    | Some mcfg =>
+      match (init_state mcfg "imp_command") with
+      | inl e => inl e
+      | inr initial_state =>
+        let '(pc, e, stk) := initial_state in
+        inr (eval_expr eval_op e None expr)
+      end
+    end
+  end.
 
 Definition imp_compiler_correct_aux (p:Imp.com) : Checker :=
   let fvs := IDSet.elements (fv p) in
@@ -289,11 +306,14 @@ Definition imp_compiler_correct_aux (p:Imp.com) : Checker :=
                                ++ (string_of fvs) (* (elems_to_string fvs) *)
                                ++ "; compiled code: "
                                ++ (string_of ll_prog))
-                            (imp_memory_eqb (*!*) (List.rev llvm_st) (*! llvm_st *) ans_state))
+                            (imp_memory_eqb (**!*) (List.rev llvm_st) (**! llvm_st *) ans_state))
         end        
       end
     end
   end.
+
+Definition check_imp_compiler_correct_with_stats : com -> Checker :=
+  (fun c : com => collect c (imp_compiler_correct_aux c)).
 
 Definition run_imp_compiler_correct (p:Imp.com) : string :=
   let fvs := IDSet.elements (fv p) in
@@ -338,11 +358,9 @@ Definition compile_aexp_correct (a:aexp) : Checker :=
   let p := (Id "fresh_var" ::= a) in
   imp_compiler_correct_aux p.  
 
-
 Definition compile_bexp_correct (b:bexp) : Checker :=
   let p := (IFB b THEN idX ::= ANum (Int64.repr 1) ELSE idY ::= ANum (Int64.repr 2) FI) in
   imp_compiler_correct_aux p.  
-
 
 Definition show_aexp_compilation_result (result : err (Ollvm_ast.value * list elt)) :=
   match result with
@@ -356,33 +374,14 @@ Definition show_bexp_compilation_result (result : err (Ollvm_ast.value * list el
   | inr (_ , elts) => string_of elts
   end.
 
-
 Definition show_result (result : err (toplevel_entities (list block))) :=
   match result with
   | inl _ => "error"
   | inr l => fold_left (fun s tle_blk => (s ++ "; " ++ (string_of tle_blk))%string) l ""
   end.
 
-(*
-Fixpoint stepD_n_steps (cfg : mcg) (state : SS.state) (n : nat) :
-  SS.state + Event SS.state :=
-  match n with
-  | O => inl state
-  | S n' =>
-    match stepD cfg state with
-    | inl state' => stepD_n_steps state' n
-    | inr event =>
-      match event with
-      | Fin v => inr (Fin v)
-      | Err s => inr (Err s)
-      | Eff eff =>
-        match eff with
-        | Alloca 
-        stepD_n_steps cfg (
- *)
 
-
-(* Tests *)
+(******** Tests ********)
 
 Extract Constant Test.defNumTests => "100".
 
@@ -409,16 +408,16 @@ Existing Instance gen_bexp_with_small_aexp.
 Existing Instance gen_adhoc_aexp.
 Existing Instance gen_small_nonneg_i64.
 
-(**! QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
+(*! QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
 (* Shrinking is slow: 
    QuickChick (forAllShrink (arbitrarySized 0) shrink imp_compiler_correct_aux).
  *)
 
 (* Failure because of 
    (1) wrong dvalue_of_int64 in imp_compiler_correct
-   (2) compiler compiles literals to DV (VALUE_Integer _) instead of a dummy 
-       binary operation following LLVM programs. Modified compilation of 
-       free variables and compilation of literals. 
+   (2) store semantics is incorrect. It should be possible to have something like
+       "store i64 0, %ptr", and this is indeed what the IMP compiler compiles to;
+       however, Ollvm_ast's VALUE_Integers get stuck in eval_expr. 
 *)
 Example prog_literal1 :=
   idW ::= (APlus (AMult (AId idX) (ANum (Int64.repr 2)))
@@ -433,9 +432,21 @@ Example prog_literal3 :=
 (*
 Compute (run_imp_compiler_correct prog_literal2).
 Compute (run_imp_compiler_correct prog_literal3).
+Compute (compile prog_literal3).
+Compute (debug prog_literal3 1).
+Compute (debug prog_literal3 2).
+Compute (debug prog_literal3 3).
+Compute (debug prog_literal3 4).
+Compute (debug prog_literal3 5).
+Compute (debug prog_literal3 6).
+Compute (debug prog_literal3 7).
+Compute (debug prog_literal3 8).
+Compute (debug prog_literal3 9).
 *)
 
-(* QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). Passed tests. *)
+(* QuickChick (forAll (arbitrarySized 0) check_imp_compiler_correct_with_stats). *)
+
+(*! QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
 
 Remove Hints gen_seq_and_assgn_com : typeclass_instances.
 Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
@@ -451,7 +462,7 @@ Existing Instance gen_bexp_with_small_aexp.
 Existing Instance gen_adhoc_aexp.
 Existing Instance gen_small_nonneg_i64.
 
-(* QuickChick (forAll (arbitrarySized 8) imp_compiler_correct_aux). Passed tests *)
+(*! QuickChick (forAll (arbitrarySized 8) imp_compiler_correct_aux). *)
 
 Remove Hints gen_seq_and_assgn_com : typeclass_instances.
 Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
@@ -467,57 +478,38 @@ Existing Instance gen_small_nonneg_i64.
 
 (* QuickChick (forAllShrink (arbitrarySized 1) shrink imp_compiler_correct_aux). *)
 
-Example prog1 :=
+(* Failure because:
+   (1) Branch semantics was expecting eval_expr in StepSemantics to evaluate 
+       Ollvm_ast's values to DV (VALUE_Bool ..). Hence the evaluation gets stuck 
+       when the boolean condition has to be evaluated (i.e. not just a 
+       (VALUE_Bool)).
+
+       Modified semantics to evaluate the conditional, including possibly 
+       an i1 like VALUE_Bool true, into a DVALUE_I1, and the branch matches on
+       that instead.
+
+   (2) Compilation of bexp expressions was injecting VALUE_Bool directly in 
+       some places. Modified to plumb through an injected LLVM instruction. 
+*)
+
+Example prog_eval_bexp_cond1 :=
   IFB (BEq (AId idW) (ANum (Int64.repr 0))) THEN SKIP ELSE SKIP FI.
 
-Example prog2 :=
+Example prog_eval_bexp_cond2 :=
   IFB (BNot BTrue) THEN SKIP ELSE SKIP FI.
 
-Example prog3 :=
+Example prog_eval_bexp_cond3 :=
   IFB BFalse THEN SKIP ELSE SKIP FI.
 
 (*
-Compute (run_imp_compiler_correct prog1).
-Compute (run_imp_compiler_correct prog2).
-Compute (run_imp_compiler_correct prog3).
-Compute (compile prog1).
-Compute (compile prog2).
-Compute (debug prog2 0).
-Compute (debug prog2 1).
-Compute (debug prog2 2).
-Compute (debug prog3 3).
- *)
+Compute (run_imp_compiler_correct prog_eval_bexp_cond1).
+Compute (run_imp_compiler_correct prog_eval_bexp_cond2).
 
-Definition run_eval_expr (expr : Expr Ollvm_ast.value) :=
-  let c := prog2 in
-  let fvs := IDSet.elements (fv c) in
-  match compile c with
-  | inl e => inl e
-  | inr ll_prog =>
-    let m := modul_of_toplevel_entities ll_prog in
-    match mcfg_of_modul m with
-    | None => inl "Compilation failed"
-    | Some mcfg =>
-      match (init_state mcfg "imp_command") with
-      | inl e => inl e
-      | inr initial_state =>
-        let '(pc, e, stk) := initial_state in
-        inr (eval_expr eval_op e expr)
-      end
-    end
-  end.
+Compute (compile prog_eval_bexp_cond2).
+Compute (debug prog_eval_bexp_cond2 1).
+Compute (debug prog_eval_bexp_cond2 2).
 
-(*
-Example cmp_for_true := OP_ICmp Eq (TYPE_I 64) (SV (VALUE_Integer 0)) (SV (VALUE_Integer 0)).
-Example cmp_for_false := OP_ICmp Eq (TYPE_I 64) (SV (VALUE_Integer 1)) (SV (VALUE_Integer 0)).
-Compute (run_eval_expr cmp_for_true).
-Compute (run_eval_expr cmp_for_false).
-
-Example xor_for_not := OP_IBinop Xor (TYPE_I 1)
-                                 (SV (VALUE_Integer 0))
-                                 (SV (VALUE_Integer 0)).
-
-Compute (run_eval_expr xor_for_not).
+Compute (run_imp_compiler_correct prog_eval_bexp_cond3).
 *)
 
 (*
@@ -525,10 +517,74 @@ If ((ANum 0 + ANum 0) <= (ANum 1 * ANum 0)) then W := (ANum 2 * ANum 0) else X :
 If (Z <= (ANum 0 * ANum 0)) then Z := ANum 0 else Skip endIf <- incomplete shrinking?
  *)
 
+(* QuickChick (forAll (arbitrarySized 1) imp_compiler_correct_aux). *)
+
+(* Failure in the presence of triple negations. 
+   - Compilation for BNot has a bug! Xor'ed with false instead of with true. 
+ *)
+
+(* If (~(~(~(ANum 4 = Y /\ ~(false))))) then Y := ANum 1 else X := ANum 5 endIf *)
+Example prog_xor_false1 :=
+  IFB (BNot (BNot (BNot (BAnd (BEq (ANum (Int64.repr 4)) (AId idY)) (BNot (BFalse)))))) THEN
+    idY ::= ANum (Int64.repr 1)
+  ELSE
+    idX ::= ANum (Int64.repr 5) FI.
+
+Example prog_xor_false2 :=
+  IFB (BNot (BNot (BNot BTrue))) THEN
+    idY ::= ANum (Int64.repr 1)
+  ELSE
+    idX ::= ANum (Int64.repr 5) FI.
+
+Example prog_xor_false3 :=
+  IFB (BNot (BNot BFalse)) THEN
+    idY ::= ANum (Int64.repr 1)
+  ELSE
+    idX ::= ANum (Int64.repr 5) FI.
+
+(*
+Compute (run_imp_compiler_correct prog_xor_false1).
+Compute (run_imp_compiler_correct prog_xor_false2).
+Compute (run_imp_compiler_correct prog_xor_false3).
+*)
+
+(* QuickChick (forAllShrink (arbitrarySized 1) shrink imp_compiler_correct_aux). *)
+
+(*! QuickChick (forAll (arbitrarySized 8) imp_compiler_correct_aux). *)
+
+(*
+Compile command: ocamlopt -rectypes -w a -I /tmp -I <>/.opam/4.03.0/lib/coq/user-contrib/QuickChick <>/.opam/4.03.0/lib/coq/user-contrib/QuickChick/quickChickLib.cmx /tmp/QuickChick94353c.ml -o /tmp/QuickChick94353c
+Segmentation fault (core dumped)
+*)
+
 Remove Hints gen_if_com : typeclass_instances.
 Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
 Remove Hints gen_adhoc_aexp : typeclass_instances.
 Remove Hints gen_small_nonneg_i64 : typeclass_instances.
 
+(* End TestIf *)
 
-(* End TestMultipleCom *)
+
+(*! Section TestWhile *) (*! extends Compiler *)
+
+(* Print Hint GenSized. *)
+
+Existing Instance gen_while_com.
+Existing Instance gen_bexp_with_proportional_aexp.
+Existing Instance gen_adhoc_aexp.
+Existing Instance gen_small_nonneg_i64.
+
+(* Sample (@arbitrarySized com gen_while_com 3). *)
+(**! QuickChick (forAllShrink (arbitrarySized 8) shrink imp_compiler_correct_aux). *)
+(*! QuickChick (forAll (arbitrarySized 6) check_imp_compiler_correct_with_stats). *)
+
+Definition test_term := QuickChick.Test.quickCheck (forAll (arbitrarySized 6) check_imp_compiler_correct_with_stats).
+
+(* Separate Extraction *)
+
+Remove Hints gen_while_com: typeclass_instances.
+Remove Hints gen_bexp_with_small_aexp: typeclass_instances.
+Remove Hints gen_adhoc_aexp: typeclass_instances.
+Remove Hints gen_small_nonneg_i64: typeclass_instances.
+
+(* End TestWhile *)

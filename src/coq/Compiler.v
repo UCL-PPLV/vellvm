@@ -19,6 +19,16 @@ Require Import Vellvm.Classes Vellvm.Ollvm_ast Vellvm.AstLib.
 (* Logical Foundations dependencies *)
 Require Import Vellvm.Imp Vellvm.Maps.
 
+(* Setup for 1bit integers *)
+Module Wordsize1.
+  Definition wordsize := 1%nat.
+  Remark wordsize_not_zero: wordsize <> 0%nat.
+  Proof. unfold wordsize; congruence. Qed.
+End Wordsize1.
+
+Module Int1 := Make(Wordsize1).
+
+Definition int1 := Int1.int.
 
 (* "Flattened" representation of Vellvm code *)
 Inductive elt :=
@@ -46,8 +56,8 @@ Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list blo
         | None => 
           if (List.length insns) == 0%nat then mret ([], None, blks)
           else failwith "terminator not found"
-        | Some (id, t) =>
-          mret ([], None, (mk_block l insns t id)::blks)
+        | Some tm =>
+          mret ([], None, (mk_block l [] insns tm)::blks)
         end
       | T id t  => mret ([], Some (id, t), blks)
       | I uid insn => mret ((uid,insn)::insns, term_opt, blks)
@@ -56,8 +66,8 @@ Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list blo
   ;
     match term_opt with
     | None => failwith "terminator not found"
-    | Some (id, t) =>
-      mret ((mk_block entry_label insns t id) :: blks)
+    | Some tm =>
+      mret ((mk_block entry_label [] insns tm) :: blks)
     end.
 
 
@@ -162,13 +172,19 @@ Definition lift {A} (e:string) (m:option A) : LLVM A :=
   fun s => (s, trywith e m).
 Hint Unfold lift.
 
-Definition lid_of_Z (n:int) : local_id := Name ("x"++(string_of n))%string.
+Definition lid_of_Z (n:int) : local_id := Raw n.
 
 Lemma lid_of_Z_inj: forall n1 n2, n1 <> n2 -> lid_of_Z n1 <> lid_of_Z n2.
-(* Technically, can't prove this because string_of n is not injective -- too large of numbers
-   become the same error message *)
 Proof.
-Admitted.
+  intros. unfold lid_of_Z. unfold not. intros. apply H. inversion H0. reflexivity.
+Qed.
+
+Lemma lid_of_Z_inj2: forall n1 n2, lid_of_Z n1 = lid_of_Z n2 -> n1 = n2.
+Proof.
+  intros n1 n2 H.
+  inversion H.
+  reflexivity.
+Qed.  
 
 Definition genlabel : () -> LLVM (local_id) :=
   fun _ => fun '(n,m,c) => ((1+n,m,c), mret (lid_of_Z n))%Z.
@@ -190,6 +206,9 @@ Definition val_of_nat (n:nat) : value :=
 
 Definition val_of_int64 (i:int64) : value :=
   SV (VALUE_Integer (Int64.signed i)).
+
+Definition val_of_int1 (i:int1) : value :=
+  SV (VALUE_Integer (Int1.signed i)).
 
 Definition val_of_ident (id:ident) : value :=
   SV (VALUE_Ident id).
@@ -235,6 +254,9 @@ Definition store v vptr : LLVM () :=
 Definition label l : LLVM () :=
   fun '(n,m,c) => ((n,m,(L l)::c), mret ()).
 
+
+(*! Section Compiler *)
+
 (* Note: list of instructions in code is generated in reverse order *)
 Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
   let compile_binop (op:ibinop) (a1 a2:aexp) :=
@@ -244,10 +266,10 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
       mret (local lid)
   in
   match a with
-  | ANum n => (* mret (val_of_int64 n) *)
-    'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_nat 0);
+  | ANum n => (* TO SEE: mret (val_of_int64 n) *)
+    (*! *) 'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_nat 0);
       mret (local lid)
-
+    (*! mret (val_of_int64 n) *)
   | AId x =>
     'ptr <- lift "AId ident not found" (g x);
     'lid <- load ptr;
@@ -266,15 +288,18 @@ Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
       mret (local lid)
   in
   match b with
-  | BTrue     => mret (val_of_bool true)
-  | BFalse    => mret (val_of_bool false)
+  | BTrue     => 
+    'lid <- comp Eq (val_of_int64 (Int64.repr 0)) (val_of_int64 (Int64.repr 0));
+    mret (local lid)
+  | BFalse    => 
+    'lid <- comp Eq (val_of_int64 (Int64.repr 1)) (val_of_int64 (Int64.repr 0));
+    mret (local lid)
   | BEq a1 a2 => compile_icmp Eq a1 a2
-  | BLe a1 a2 => compile_icmp Ule a1 a2
-
+  | BLe a1 a2 => compile_icmp Sle a1 a2
   | BNot b =>
     'v <- compile_bexp g b;
-    'lid <- binop Xor i1 v (val_of_bool true);
-    mret (local lid)
+    'lid <- emit (INSTR_Op (SV (OP_ICmp Eq i1 (val_of_int1 (Int1.repr 0)) v)));
+    mret (local lid) 
 
   | BAnd b1 b2 =>
     'v1 <- compile_bexp g b1;
@@ -337,8 +362,9 @@ Fixpoint compile_fv (l:list id) : LLVM ctxt :=
     'uid <- alloca ();
     (* '; store (val_of_nat 0) (local uid); *)
     (* CHKoh: is the following right? *)
-    'v <- compile_aexp g (APlus (ANum (Int64.repr 0%Z)) (ANum (Int64.repr 0%Z))); 
+    'v <- compile_aexp g (ANum (Int64.repr 0%Z)); 
     '; store v (local uid);
+      
     mret (update g x (local uid)) 
   end.
 
