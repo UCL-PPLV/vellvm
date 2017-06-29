@@ -27,3 +27,5 @@ src/ml/extracted/*.ml
 src/ml/extracted/STAMP
 src/.depend
 /lib/paco
+/lib/CompCert
+/lib/QuickChick
