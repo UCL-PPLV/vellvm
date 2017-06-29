@@ -89,16 +89,23 @@ Definition sampleSingleLineProgram3 := CAss Z (AMult (AId Y) (ANum 5)).
 Definition sampleSingleLineProgram4 := CAss W (APlus (AMinus (AId Z) (ANum 1)) (AId X)).
 
 
-Eval compute in no_data_dependency_calc sampleSingleLineProgram sampleSingleLineProgram1.
-Eval compute in no_data_dependency_calc sampleSingleLineProgram1 sampleSingleLineProgram2.
-Eval compute in no_data_dependency_calc sampleSingleLineProgram1 sampleSingleLineProgram3.
+Eval compute in (sMR sampleSingleLineProgram3 u sMW sampleSingleLineProgram1).
+Eval compute in (sMW sampleSingleLineProgram3 u sMR sampleSingleLineProgram1).
+Eval compute in (sMW sampleSingleLineProgram3 u sMW sampleSingleLineProgram1).
+Eval compute in ((sMW sampleSingleLineProgram3 u sMW sampleSingleLineProgram1) n (sMW sampleSingleLineProgram3 u sMR sampleSingleLineProgram1)) n (sMR sampleSingleLineProgram3 u sMW sampleSingleLineProgram1).
+
+
+Eval compute in no_data_dependency_calc sampleSingleLineProgram1 sampleSingleLineProgram.
+Eval compute in no_data_dependency_calc sampleSingleLineProgram2 sampleSingleLineProgram.
+Eval compute in no_data_dependency_calc sampleSingleLineProgram3 sampleSingleLineProgram.
+Eval compute in no_data_dependency_calc sampleSingleLineProgram4 sampleSingleLineProgram.
 
 
 Fixpoint DataDependencyInCommands (c: com) :=
   match c with
   | CSeq a b => (no_data_dependency_calc a b) || DataDependencyInCommands b
   | CIf _ a b => DataDependencyInCommands a || DataDependencyInCommands b 
-  | CWhile _ _ => false
+  | CWhile _ a => DataDependencyInCommands a
   | CAss _ _ => false
   | CFrom _ _ a => DataDependencyInCommands a
   | CFor _ _ _ a => DataDependencyInCommands a
@@ -106,7 +113,46 @@ Fixpoint DataDependencyInCommands (c: com) :=
 end.
 
 
-Theorem test : forall a, cequiv (a) (CFrom 0 1 a).
-Proof. split;intros.
--inversion H; subst.
-  +apply E_FromEnd.
+Theorem test1: forall a st, SKIP / st \\ st <-> (CFrom 1 1 a) / st \\ st.
+Proof. intros; split; intros. inversion H; subst. apply E_FromEnd. simpl. reflexivity.
+inversion H. subst. apply E_Skip. subst. simpl in H3. inversion H3. Qed.
+
+
+Theorem test2: forall a st st', ceval (CFrom 0 1 a) st st' -> ceval a st st'.
+Proof. intros. inversion H. subst.
+  -simpl in H5. inversion H5.
+  -subst. simpl in H7. inversion H7. subst. apply H6.
+  -subst. simpl in H4. inversion H4. Qed.
+
+Theorem test4: forall st st', ceval (CFrom 0 1 SKIP) st st' -> ceval SKIP st st'.
+Proof. intros. inversion H.
+  -simpl in H5. inversion H5.
+  -subst. simpl in H7. inversion H7. subst. apply H6.
+  -subst. simpl in H4. inversion H4. Qed.
+
+
+Theorem test5: forall st st', ceval (CFrom 0 1 SKIP) st st' -> ceval SKIP st st' -> st = st'.
+Proof. intros. inversion H0. auto. Qed.
+
+
+
+
+Theorem test3: forall a st st', ceval a st st' <-> ceval (CFrom 0 1 a) st st'.
+Proof. intros. split; intros.
+  -inversion H.
+
+
+
+
+
+Theorem test3: forall a st st',  ceval a st st' <-> ceval (CFrom 0 1 a) st st'.
+Proof. intros. split. intros. SearchAbout ceval. 
+
+
+
+
+
+
+
+
+
