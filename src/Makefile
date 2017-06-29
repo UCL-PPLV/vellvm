@@ -14,12 +14,19 @@ MENHIR=menhir
 CP=cp
 
 QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick
-IMPCOQFILES := Maps Imp ImpCEvalFun Compiler CompilerProp ImpCorrectness ImpOptimizer ImpCorrectnessTest
-COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality $(IMPCOQFILES) $(QUICKCHICKFILES)
+IMPCOQFILES := Maps Imp ImpCEvalFun Compiler
+COQFILES :=  $(IMPCOQFILES) Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality 
 OLLVMFILES := 
 
-VFILES := $(COQFILES:%=coq/%.v)
-VOFILES := $(COQFILES:%=coq/%.vo)
+
+DEPENDENCYFILES := DEPIMP SetTheory DataDependency
+OPTIMISATIONFILES := ConstantFolding
+LOOPFILES := 
+
+
+
+VFILES := $(COQFILES:%=coq/%.v) $(DEPENDENCYFILES:%=coq/Dependency/%.v)
+VOFILES := $(COQFILES:%=coq/%.vo) $(DEPENDENCYFILES:%=coq/Dependency/%.vo)
 
 all:
 	@test -f .depend || $(MAKE) depend
