@@ -6,7 +6,7 @@ COQLIBDIR = ../lib
 MLDIR = ml imp
 EXTRACTDIR = ml/extracted
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(COQLIBDIR)/paco/src Paco -R $(EXTRACTDIR) Extract -R ../lib/CompCert compcert
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(COQLIBDIR)/paco/src Paco -R $(EXTRACTDIR) Extract -R ../lib/CompCert compcert -R $(COQLIBDIR)/RelationAlgebra/ RelationAlgebra
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
@@ -15,18 +15,20 @@ CP=cp
 
 QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick
 IMPCOQFILES := Maps Imp ImpCEvalFun Compiler
-COQFILES :=  $(IMPCOQFILES) Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality 
+COQFILES :=   Classes Util Ollvm_ast  Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform $(IMPCOQFILES) DecidableEquality
 OLLVMFILES := 
 
 
 DEPENDENCYFILES := DEPIMP SetTheory DataDependency
 OPTIMISATIONFILES := ConstantFolding
-LOOPFILES := 
+RELATIONALGEBRAFILES := ast
+
+LOOPFILES := LoopIdentification
 
 
 
-VFILES := $(COQFILES:%=coq/%.v) $(DEPENDENCYFILES:%=coq/Dependency/%.v)
-VOFILES := $(COQFILES:%=coq/%.vo) $(DEPENDENCYFILES:%=coq/Dependency/%.vo)
+VFILES := $(COQFILES:%=coq/%.v) $(DEPENDENCYFILES:%=coq/Dependency/%.v) $(OPTIMISATIONFILES:%=coq/Optimisations/%.v) $(LOOPFILES:%=coq/Loops/%.v)
+VOFILES := $(COQFILES:%=coq/%.vo) $(DEPENDENCYFILES:%=coq/Dependency/%.vo) $(OPTIMISATIONFILES:%=coq/Optimisations/%.vo) $(LOOPFILES:%=coq/Loops/%.vo)
 
 all:
 	@test -f .depend || $(MAKE) depend
