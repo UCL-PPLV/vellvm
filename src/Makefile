@@ -13,9 +13,15 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
+<<<<<<< HEAD
 QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick
 IMPCOQFILES := Maps Imp ImpCEvalFun Compiler
 COQFILES :=   Classes Util Ollvm_ast  Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform $(IMPCOQFILES) DecidableEquality
+=======
+QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick CompilerQuickChick ImpCorrectnessTest
+IMPCOQFILES := Maps Imp ImpCEvalFun Compiler ImpCorrectness ImpOptimizer CompilerProp 
+COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp $(IMPCOQFILES) $(QUICKCHICKFILES)
+>>>>>>> ead7c668400fca74e7e486ce9eb18f38ce087f98
 OLLVMFILES := 
 
 
@@ -29,6 +35,8 @@ LOOPFILES := LoopIdentification
 
 VFILES := $(COQFILES:%=coq/%.v) $(DEPENDENCYFILES:%=coq/Dependency/%.v) $(OPTIMISATIONFILES:%=coq/Optimisations/%.v) $(LOOPFILES:%=coq/Loops/%.v)
 VOFILES := $(COQFILES:%=coq/%.vo) $(DEPENDENCYFILES:%=coq/Dependency/%.vo) $(OPTIMISATIONFILES:%=coq/Optimisations/%.vo) $(LOOPFILES:%=coq/Loops/%.vo)
+
+EXPERIMENT_FILES := MiniLLVM Vellvm Extract_Haskell_Ollvm_ast Experiments
 
 all:
 	@test -f .depend || $(MAKE) depend
@@ -68,7 +76,7 @@ print-ocaml-includes:
 
 OCAMLLIBS := unix,str
 
-.PHONY: clean main.native test
+.PHONY: clean main.native test qc restore
 
 main.native: 
 	@echo "Compiling Vellvm"
@@ -91,5 +99,17 @@ clean:
 	ocamlbuild -clean
 	rm -rf output
 	rm -f vellvm
+
+qc:
+	cp coq/Makefile_QuickChick coq/Makefile
+	cp coq/_CoqProject_QuickChick coq/_CoqProject
+	$(foreach f, $(EXPERIMENT_FILES), mv coq/$(f).v coq/$(f).bak;)
+	cd coq; echo "Entering coq/"; quickChick -top Vellvm -v
+	$(foreach f, $(EXPERIMENT_FILES), mv coq/$(f).bak coq/$(f).v;)
+
+restore:
+	rm coq/Makefile
+	rm coq/_CoqProject
+	$(foreach f, $(EXPERIMENT_FILES), mv coq/$(f).bak coq/$(f).v;)
 
 -include .depend

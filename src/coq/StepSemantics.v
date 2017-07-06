@@ -27,16 +27,10 @@ Module Type ADDR.
   Parameter addr : Set.
 End ADDR.  
 
-(* Set up for i1, i32, and i64 *)
-Module Wordsize1.
-  Definition wordsize := 1%nat.
-  Remark wordsize_not_zero: wordsize <> 0%nat.
-  Proof. unfold wordsize; congruence. Qed.
-End Wordsize1.
-
+(* Set up for i1, i32, and i64 *) 
 Module Int64 := Integers.Int64.
 Module Int32 := Integers.Int.
-Module Int1 := Make(Wordsize1).
+Module Int1 := Ollvm_ast.Int1.
 
 Definition int1 := Int1.int.
 Definition int32 := Int32.int.
@@ -825,9 +819,9 @@ Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_i
   in
   match find_block_entry CFG fid bid_tgt with
   | None => failwith ("jump: target block " ++ string_of bid_tgt ++ " not found")
-  | Some (BlockEntry phis pc_next) =>
+  | Some (BlockEntry phis pc_entry) =>
     'e_out <- monad_fold_right eval_phi phis e_init;
-      mret (pc_next, e_out, k)
+      mret (pc_entry, e_out, k)
   end.
 
 
@@ -959,7 +953,7 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
 
     
 
-(* Assumes that the entry-point function is named "fn" and that it takes
+(* Assumes that the entry-point function is named "fname" and that it takes
    no parameters *)
 Definition init_state (CFG:mcfg) (fname:string) : err state :=
   'fentry <- trywith ("INIT: no function named " ++ fname) (find_function_entry CFG (Name fname));

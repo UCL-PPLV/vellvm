@@ -1,5 +1,5 @@
 # Coq sources
-COQLIBDIR = ../../../lib
+COQLIBDIR = ../../lib
 
 # OCaml sources
 
@@ -7,9 +7,9 @@ COQINCLUDES=-R . Vellvm -R $(COQLIBDIR)/paco/src Paco -R $(COQLIBDIR)/CompCert c
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 
-QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick
-IMPCOQFILES := Maps Imp ImpCEvalFun Compiler CompilerProp ImpCorrectness ImpOptimizer ImpCorrectnessTest
-COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality $(IMPCOQFILES) $(QUICKCHICKFILES) QuickChickTop
+QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick CompilerQuickChick ImpCorrectnessTest CompilerProp
+IMPCOQFILES := Maps Imp ImpCEvalFun Compiler ImpCorrectness ImpOptimizer 
+COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp $(IMPCOQFILES) $(QUICKCHICKFILES) QuickChickTop
 OLLVMFILES := 
 
 VFILES := $(COQFILES:%=%.v)
