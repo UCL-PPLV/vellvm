@@ -5,9 +5,12 @@ Require Import ZArith.
 Require Import compcert.lib.Integers.
 
 (* Vellvm dependencies *)
-Require Import Vellvm.Ollvm_ast Vellvm.Compiler Vellvm.AstLib Vellvm.CFG Vellvm.StepSemantics Vellvm.Memory.
+Require Import Vellvm.Ollvm_ast Vellvm.CFG Vellvm.StepSemantics Vellvm.Memory.
+Require Import Vellvm.Compiler.
 Require Import Vellvm.Classes.
 Require Import Vellvm.AstLib.
+
+(** ** Decidable Equality *) 
 
 Instance eq_dec_int : eq_dec (BinNums.Z) := Z.eq_dec.
 
@@ -146,13 +149,20 @@ Ltac lift_decide_eq_from_inside_sv :=
   end.
 
 
-(*
-Instance eq_dec_raw_id : eq_dec raw_id.
+Instance eq_dec_global_id : eq_dec global_id.
+Proof. lift_decide_eq. Defined.
+
+Instance eq_dec_function_id : eq_dec function_id.
+Proof. lift_decide_eq. Defined.
+
+Instance eq_dec_block_id : eq_dec block_id.
+Proof. lift_decide_eq. Defined.
+
+Instance eq_dec_local_id : eq_dec local_id.
 Proof. lift_decide_eq. Defined.
 
 Instance eq_dec_instr_id : eq_dec instr_id.
 Proof. lift_decide_eq. Defined.
-*)
 
 Definition typ_strong_ind: forall P : Ollvm_ast.typ -> Set,
     (forall sz : int, P (TYPE_I sz)) ->
@@ -552,11 +562,9 @@ Proof.
     try (lift_decide_eq);
     try destruct e; unfold Decidable;
       try (right; intro H; inversion H; tauto);
-      try (lift_decide_eq_from_inside_dv).
-  - left; auto.
-  - left; auto.
-  - left; auto.
-  - left; auto.
+      try (lift_decide_eq_from_inside_dv);
+      try solve [left; auto];
+      try solve [lift_decide_eq].
 
   (* DV (VALUE_Struct ...) *)
   - destruct fields; auto.
@@ -874,13 +882,6 @@ Proof.
     { intros H; inversion H; apply v1_t_neq; subst; auto. }    
     { intros H; inversion H; apply cnd_v_neq; subst; auto. }
     { intros H; inversion H; apply cnd_t_neq; subst; auto. }
-
-  - lift_decide_eq.
-  - lift_decide_eq.
-  - lift_decide_eq.
-  - lift_decide_eq.
-  - lift_decide_eq.
-  - left; auto.
 Defined.
 
 Definition expr_svalue_ind: forall P : Ollvm_ast.value -> Set,
@@ -1072,11 +1073,8 @@ Proof.
     try (lift_decide_eq);
     try destruct e; unfold Decidable;
       try (right; intro H; inversion H; tauto);
-      try (lift_decide_eq_from_inside_sv).
-  - left; auto.
-  - left; auto.
-  - left; auto.
-  - left; auto.
+      try (lift_decide_eq_from_inside_sv);
+      try solve [left; auto].
 
   (* SV (VALUE_Struct ...) *)
   - destruct fields; auto.
@@ -1405,8 +1403,70 @@ Instance eq_dec_terminator : eq_dec terminator.
 Proof.
   lift_decide_eq; left; auto.
 Defined.
+  
+Instance eq_dec_phi : eq_dec Ollvm_ast.phi.
+Proof. lift_decide_eq. Defined.
 
-Instance eq_dec_elt : eq_dec elt.
+Instance eq_dec_code : eq_dec code.
 Proof.
-  lift_decide_eq; left; auto.
+  unfold code; lift_decide_eq;
+  left; auto.
+Defined.
+
+Instance eq_dec_block : eq_dec block.
+Proof. lift_decide_eq. Defined.
+
+Instance eq_dec_pc : eq_dec pc.
+Proof. lift_decide_eq. Defined.
+
+Instance eq_dec_frame : eq_dec frame.
+Proof. lift_decide_eq. Defined.
+
+Instance eq_dec_SS_state : eq_dec SS.state.
+Proof. lift_decide_eq. Defined.
+
+(*
+The following are not true. 
+Instance eq_dec_effects `{eq_dec D} : eq_dec (effects D).
+Instance eq_dec_transition `{eq_dec X} : eq_dec (transition X).
+*)
+
+
+(** ** Basic Propositions *) 
+
+Inductive prefix_of {A : Type}: list A -> list A -> Prop :=
+| prefix_nil : forall l : list A, prefix_of [] l
+| prefix_cons_same : forall a l1 l2, prefix_of l1 l2 -> prefix_of (a :: l1) (a :: l2).
+
+Inductive suffix_of {A : Type}: list A -> list A -> Prop :=
+| suffix_nil : forall l : list A, suffix_of l []
+| suffix_app : forall a l1 l2, suffix_of l1 l2 -> suffix_of (l1 ++ [a]) (l2 ++ [a]).
+
+Instance dec_prefix_of : forall A `{eq_dec A} (l1 l2 : list A), Decidable (prefix_of l1 l2).
+Proof.
+  intros A A_decidable.
+  induction l1 as [| a l1']; unfold Decidable.
+  - intros [| a l2']; left; constructor.
+  - intros [| b l2']; try solve [right; intros H; inversion H].
+    refine
+      (match a == b with
+       | left _ =>
+         match decide (prefix_of l1' l2') with
+         | left tail_eq => _
+         | right tail_neq => right _
+         end
+       | right head_neq => right _
+       end).
+    { subst; constructor. constructor. tauto. }
+    { intros H. apply tail_neq. inversion H; subst; auto. }
+    { intros H. apply head_neq. inversion H; subst; auto. }
+Defined.
+
+Instance dec_Z_leq : forall n m : int, Decidable (n <= m)%Z.
+Proof.
+  unfold Decidable. intros n m.
+  destruct (n <=? m)%Z eqn:n_m.
+  - left; rewrite Z.leb_le in n_m; auto.
+  - right; intros H; rewrite <- Z.leb_le in H;
+      rewrite n_m in H; inversion H.
 Defined.

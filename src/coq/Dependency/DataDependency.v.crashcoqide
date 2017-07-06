@@ -79,7 +79,7 @@ Definition cequiv (c1 c2 : com) : Prop :=
 
 
 
-Definition no_data_dependency_calc (a b: com) : bool := nilp ((sMR a U sMW b) N (sMW a U sMR b) N (sMW a U sMW b)).
+Definition no_data_dependency_calc (a b: com) : bool := nilp ((sMR a u sMW b) n (sMW a u sMR b) n (sMW a u sMW b)).
 
 
 Definition sampleSingleLineProgram := CAss W (APlus (ANum 1) (ANum 1)).
@@ -89,10 +89,10 @@ Definition sampleSingleLineProgram3 := CAss Z (AMult (AId Y) (ANum 5)).
 Definition sampleSingleLineProgram4 := CAss W (APlus (AMinus (AId Z) (ANum 1)) (AId X)).
 
 
-Eval compute in (sMR sampleSingleLineProgram3 U sMW sampleSingleLineProgram1).
-Eval compute in (sMW sampleSingleLineProgram3 U sMR sampleSingleLineProgram1).
-Eval compute in (sMW sampleSingleLineProgram3 U sMW sampleSingleLineProgram1).
-Eval compute in ((sMW sampleSingleLineProgram3 U sMW sampleSingleLineProgram1) N (sMW sampleSingleLineProgram3 U sMR sampleSingleLineProgram1)) N (sMR sampleSingleLineProgram3 U sMW sampleSingleLineProgram1).
+Eval compute in (sMR sampleSingleLineProgram3 u sMW sampleSingleLineProgram1).
+Eval compute in (sMW sampleSingleLineProgram3 u sMR sampleSingleLineProgram1).
+Eval compute in (sMW sampleSingleLineProgram3 u sMW sampleSingleLineProgram1).
+Eval compute in ((sMW sampleSingleLineProgram3 u sMW sampleSingleLineProgram1) n (sMW sampleSingleLineProgram3 u sMR sampleSingleLineProgram1)) n (sMR sampleSingleLineProgram3 u sMW sampleSingleLineProgram1).
 
 
 Eval compute in no_data_dependency_calc sampleSingleLineProgram1 sampleSingleLineProgram.
@@ -140,15 +140,14 @@ Proof. intros. inversion H0. auto. Qed.
 Theorem test3: forall a st st', ceval a st st' <-> ceval (CFrom 0 1 a) st st'.
 Proof. intros. split; intros.
   -inversion H.
-Admitted.
 
 
 
 
 
-Theorem test6: forall a st st',  ceval a st st' <-> ceval (CFrom 0 1 a) st st'.
-Proof. intros. split. intros. SearchAbout ceval.
-Admitted.
+Theorem test3: forall a st st',  ceval a st st' <-> ceval (CFrom 0 1 a) st st'.
+Proof. intros. split. intros. SearchAbout ceval. 
+
 
 
 
