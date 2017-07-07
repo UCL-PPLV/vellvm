@@ -6,35 +6,20 @@ COQLIBDIR = ../lib
 MLDIR = ml imp
 EXTRACTDIR = ml/extracted
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(COQLIBDIR)/paco/src Paco -R $(EXTRACTDIR) Extract -R ../lib/CompCert compcert -R $(COQLIBDIR)/RelationAlgebra/ RelationAlgebra
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(COQLIBDIR)/paco/src Paco -R $(EXTRACTDIR) Extract -R ../lib/CompCert compcert -R ../lib/QuickChick/src QuickChick
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-<<<<<<< HEAD
-QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick
-IMPCOQFILES := Maps Imp ImpCEvalFun Compiler
-COQFILES :=   Classes Util Ollvm_ast  Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform $(IMPCOQFILES) DecidableEquality
-=======
 QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick CompilerQuickChick ImpCorrectnessTest
-IMPCOQFILES := Maps Imp ImpCEvalFun Compiler ImpCorrectness ImpOptimizer CompilerProp 
-COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp $(IMPCOQFILES) $(QUICKCHICKFILES)
->>>>>>> ead7c668400fca74e7e486ce9eb18f38ce087f98
+IMPCOQFILES := Maps Imp ImpCEvalFun Compiler ImpCorrectness  
+COQFILES := Classes Util Ollvm_ast  Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform  $(IMPCOQFILES) DecidableEquality  DecidableProp
 OLLVMFILES := 
 
-
-DEPENDENCYFILES := DEPIMP SetTheory DataDependency
-OPTIMISATIONFILES := ConstantFolding
-RELATIONALGEBRAFILES := ast
-
-LOOPFILES := LoopIdentification
-
-
-
-VFILES := $(COQFILES:%=coq/%.v) $(DEPENDENCYFILES:%=coq/Dependency/%.v) $(OPTIMISATIONFILES:%=coq/Optimisations/%.v) $(LOOPFILES:%=coq/Loops/%.v)
-VOFILES := $(COQFILES:%=coq/%.vo) $(DEPENDENCYFILES:%=coq/Dependency/%.vo) $(OPTIMISATIONFILES:%=coq/Optimisations/%.vo) $(LOOPFILES:%=coq/Loops/%.vo)
+VFILES := $(COQFILES:%=coq/%.v)
+VOFILES := $(COQFILES:%=coq/%.vo)
 
 EXPERIMENT_FILES := MiniLLVM Vellvm Extract_Haskell_Ollvm_ast Experiments
 
