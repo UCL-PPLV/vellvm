@@ -98,54 +98,6 @@ Record exm : Set :=
 Definition testBlock := mk_ex 1%nat.
 
 
-
-Definition convertToBlock (t:block) :=
-match t with
-  | mk_block a b c d => mk_block1 a b c d
-end.
-
-Definition convertFromBlock (t:block1) :=
-match t with
-  | mk_block1 a b c d => mk_block a b c d
-end.
-
-
-Record cfg := mkCFG
-{
-  init : block_id;
-  blks : list block;
-  glbl : list ident;   (* identifiers defined on entry to this CFG, 
-                          including globals and local function parameters *)
-}.
-
-
-Record cfg1 := mkCFG1
-{
-  init1 : block_id;
-  blks1 : list block1;
-  glbl1 : list ident;   (* identifiers defined on entry to this CFG, 
-                          including globals and local function parameters *)
-}.
-
-Print map.
-Print mcfg.
-
-Definition convertToGraph (t:mcfg) :=
-match t with
-  | a => a
-end.
-
-Print convertToGraph.
-
-Definition convertFromGraph (t:cfg1) :=
-match t with
-  | mkCFG1 a b c => mkCFG a (map convertFromBlock b) c
-end.
-
-Lemma cfold_stepD_correct : forall CFG s m, stepD CFG s = stepD (convertFromGraph(convertToGraph (mcfg_of_modul CFG m))) s.
-
-
-
 Print testBlock.
 
 

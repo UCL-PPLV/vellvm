@@ -240,7 +240,6 @@ Definition lbls (t:terminator) : list block_id :=
   end.
 
 (*
-
 (* Well-formed SSA-form CFGs 
    - the initial pt denotes a command  
    - fallthrough closure: each fallthrough pt maps to a command 
@@ -251,8 +250,6 @@ Definition lbls (t:terminator) : list block_id :=
 *)
 Definition pt_exists (CFG : cfg) (p:pt) : Prop :=
   exists cmd, (code CFG p) = Some cmd.
-
-
 (** Edge relation *)
 Inductive edge_pt (g:cfg) : pt -> pt -> Prop :=
 | edge_pt_S : forall p i q,
@@ -263,10 +260,8 @@ Inductive edge_pt (g:cfg) : pt -> pt -> Prop :=
     In l (lbls t) ->
     (phis g) l = Some (Phis q xs r) ->
     edge_pt g p q.
-
 (** *** GRAPH instance for dominance calculation *)
 (** Graph of program points *)
-
 Module PtGraph <: GRAPH.
   Definition t := cfg.
   Definition V := pt.
@@ -275,56 +270,44 @@ Module PtGraph <: GRAPH.
   Definition mem := pt_exists.
   Definition eq_dec_V := AstLib.eq_dec_instr_id.
 End PtGraph.
-
 Module Export Dom := Dom.Spec PtGraph.
-
 (** *** Definitions for Well-formed SSA programs. *)
-
 (** Most of the LLVM instructions define the uid associated
   with their program point.  Some (like [store], [void] calls, and the [terminator]s)
   do not. *)
 Definition def_at_pt (g:cfg) (p:pt) (lid:local_id) : Prop :=
   pt_exists g p /\ pt_defines p lid.
-
 (** The definition of id dominates its use at point pt *)
 Inductive well_scoped_use_at_pt (g:cfg) (p:pt) : ident -> Prop :=
 | ws_global : forall id, In id (glbl g) -> pt_exists g p -> well_scoped_use_at_pt g p id
 | ws_local : forall lid p', def_at_pt g p' lid -> SDom g p' p -> well_scoped_use_at_pt g p (ID_Local lid).
-
 (** All uses of a [uid] must be strictly dominated by their definitions. *)
 Definition wf_use (g:cfg) (ids:list ident) (p:pt) : Prop :=
   forall id, In id ids -> well_scoped_use_at_pt g p id.
-
-
 (** *** Well-formed phi nodes *)
 (**  Consider [ %x = phi [lbl1:v1, ...,lbln:vn] ].  This is well formed
      when every predecessor block with terminator program point p' 
      has a label associated with value v.  Moreover, if v uses an id then
      the definition of the uid strictly dominates p'.
 *)
-
 Definition wf_phi_args (g:cfg) (entry:pt) (args:list (block_id * value)) :=
   forall pred, edge_pt g pred entry ->
           exists b t, (code g) pred = Some (Jump b t) /\
                  exists v, In (b,v) args /\ wf_use g (value_uses v) pred.
-
 Inductive wf_phis (CFG : cfg) (entry:pt) (q : pt) : pt -> list (local_id * instr) -> Prop :=
 | wf_phis_nil : pt_exists CFG q ->
                 wf_phis CFG entry q q []
-
 | wf_phis_cons :
     forall p p' x t args rest,
     (code CFG p) = Some (Step (INSTR_Phi t args) p') ->
     wf_phi_args CFG entry args ->
     wf_phis CFG entry q p' rest ->
     wf_phis CFG entry q p ((x, INSTR_Phi t args) :: rest) .
-
 Inductive wf_cmd (g:cfg) (p:pt) : cmd -> Prop :=
 | wf_step : forall (i:instr) (q:pt)
               (Hq : pt_exists g q)
               (Huse: wf_use g (instr_uses i) p),
     wf_cmd g p (Step i q)
-
 | wf_jump : forall (bn:block_id) (t:terminator)
               (Huse: wf_use g (terminator_uses t) p)
               (Hlbls: Forall (fun tgt => exists p', exists xs, exists q,
@@ -333,20 +316,15 @@ Inductive wf_cmd (g:cfg) (p:pt) : cmd -> Prop :=
                       )
                       (lbls t)),
     wf_cmd g p (Jump bn t).
-
-
 (* TODO: do we have to worry about locals shadowing function parameters? 
    Could add: forall lid, In (ID_Local lid) (glbl CFG) -> (code CFG) (IId lid) = None
-
    - also, somewhere probably need that globals and function parameters are distinct
  *)
-
 Definition wf_cfg (CFG : cfg) : Prop :=
   pt_exists CFG (init CFG)
   /\ forall p, ~ edge_pt CFG p (init CFG)            
   /\ (forall p cmd, (code CFG p) = Some cmd -> wf_cmd CFG p cmd)
 .
-
             
 Lemma wf_cfg_edge_pt : forall g p1 p2,
     wf_cfg g -> pt_exists g p1 -> edge_pt g p1 p2 -> pt_exists g p2.
@@ -367,27 +345,21 @@ Proof.
       exact H4.
 Unshelve. auto.
 Qed.      
-
-
 (* domination trees --------------------------------------------------------- *)
-
   (* Quite hard to prove this:
       - need to know that Dom can be definied equivalently by quantifying over 
         all acyclic paths from entry
       - need to know that there are a finite number of acyclic paths (and hence can
         be enumerated)  DFS
       - would work better with adjacency list representation of the graph
-
   *)
   Lemma dom_dec : forall (g:cfg) (v1 v2 : pt), {Dom g v1 v2} + {~Dom g v1 v2}.
   Proof.
     intros g v1 v2.
   Admitted.
   
-
   Inductive vtree (A:Type) : Type :=
   | vnode (v:A) (cs:list (vtree A)).
-
   Arguments vnode {A} _ _.
   
   Inductive dom_tree (g:cfg) : instr_id -> (vtree instr_id) -> Prop :=
@@ -396,10 +368,6 @@ Qed.
         (forall u, IDom g v u -> exists (t:vtree instr_id), In t cs /\ dom_tree g u t) ->
         (forall t, In t cs -> exists u, IDom g v u /\ dom_tree g u t) ->
         dom_tree g v (vnode v cs). 
-
   Lemma dom_tree_exists : forall (g:cfg), exists (t:vtree instr_id), dom_tree g (init g) t.
   Admitted.
-
-
-
 *)

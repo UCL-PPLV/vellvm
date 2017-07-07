@@ -370,4 +370,3 @@ Module AlgdomProperties (Import G:GRAPH) (Import A : Algdom G).
   Qed.
 
 End AlgdomProperties.
-
