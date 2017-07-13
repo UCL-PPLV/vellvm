@@ -10,7 +10,8 @@
 *)
 
 Require Import Equalities Arith.
-Require Import Vminus.Atom Env.
+Require Import Vminus.Atom Vminus.Env.
+Require Import Vminus.Sequences.
 
 (** *** Identifiers *)
 
@@ -157,3 +158,76 @@ Inductive step : (com * state) -> (com * state) -> Prop :=
          (IFB e THEN (c ;; WHILE e DO c END) ELSE SKIP FI, st).
 
 
+Definition imp_step_star := star step.
+
+(** Imp Evaluator **)
+
+Fixpoint imp_eval1 (c: com) (st: state) (fuel : nat) : option state :=
+  match fuel with
+  | 0 => None
+  | S n' => 
+    match c with
+    | (i ::= a) => Some (update st i (aeval a st))
+    | c1 ;; c2 =>
+      match imp_eval1 c1 st n' with
+      | Some st' => imp_eval1 c2 st' n'
+      | None => None
+      end
+    | SKIP => Some st
+    | IFB e THEN c1 ELSE c2 FI =>
+      if beval e st then imp_eval1 c1 st n' else imp_eval1 c2 st n'
+    | WHILE e DO c END =>
+      if beval e st then imp_eval1 (c ;; WHILE e DO c END) st n'
+      else Some st
+    end
+  end.
+
+Fixpoint imp_eval2 (c: com) (st: state) (fuel: nat) : option state :=
+  match fuel with
+  | 0 => None
+  | S n' =>
+    match c with
+    | (i ::= a) => Some (update st i (aeval a st))
+    | c1 ;; c2 =>
+      match c1 with
+      | SKIP => imp_eval2 c2 st n'
+      | _ => 
+        match imp_eval2 c1 st n' with
+        | Some st' => imp_eval2 c2 st' n'
+        | None => None
+        end
+      end
+    | SKIP => None
+    | IFB e THEN c1 ELSE c2 FI =>
+      if beval e st then imp_eval2 c1 st n' else imp_eval2 c2 st n'
+    | WHILE e DO c END =>
+      if beval e st then imp_eval2 (c ;; WHILE e DO c END) st n'
+      else Some st
+    end
+  end.
+
+Fixpoint imp_eval (c: com) (st: state) (fuel: nat) : option state :=
+  match fuel with
+  | 0 => None
+  | S n' =>
+    match c with
+    | (i ::= a) => Some (update st i (aeval a st))
+    | c1 ;; c2 =>
+      match c1 with
+      | SKIP => imp_eval c2 st n'
+      | _ => 
+        match imp_eval c1 st n' with
+        | Some st' => imp_eval c2 st' n'
+        | None => None
+        end
+      end
+    | SKIP => None
+    | IFB e THEN c1 ELSE c2 FI =>
+      if beval e st then imp_eval c1 st n' else imp_eval c2 st n'
+    | WHILE e DO c END =>
+      if beval e st then imp_eval (c ;; WHILE e DO c END) st n'
+      else None
+    end
+  end.
+
+  

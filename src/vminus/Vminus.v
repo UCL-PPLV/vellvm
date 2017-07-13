@@ -26,6 +26,7 @@
 
 Require Import Arith List.
 Import ListNotations.
+
 Require Import Vminus.Atom Vminus.Dom Vminus.Env Vminus.Imp Vminus.Util.
 
 (* ####################################################### *)
@@ -45,13 +46,25 @@ Require Import Vminus.Atom Vminus.Dom Vminus.Env Vminus.Imp Vminus.Util.
 
 (** Basic block labels *)
 
-Module Lbl : ATOM := Atom.
+(* QuickChick Note: Setting transparent ascription for Lbl and Uid 
+   because they cannot be generated outside of the module. To refactor.
+*)
+
+(* Module Lbl : ATOM := Atom. *)
+Module Lbl := Atom.
 Notation lbl := Lbl.t.
 
+Definition eq_dec_lbl : forall l1 l2 : lbl, {l1 = l2} + {~(l1 = l2)}.
+Proof. apply Atom.eq_dec. Defined.
+  
 (** Local unique identifiers *)
 
-Module Uid : ATOM := Atom.
+(* Module Uid : ATOM := Atom. *)
+Module Uid := Atom.
 Notation uid := Uid.t.
+
+Definition eq_dec_uid : forall uid1 uid2 : uid, {uid1 = uid2} + {~(uid1 = uid2)}.
+Proof. apply Atom.eq_dec. Defined.
 
 (** Mutable (integer) addresses *)
 
@@ -60,6 +73,11 @@ Notation uid := Uid.t.
 Module Addr := Atom. 
 Notation addr := Addr.t.
 
+Definition eq_dec_addr :
+  forall addr1 addr2 : addr, {addr1 = addr2} + {~(addr1 = addr2)}.
+Proof. apply Atom.eq_dec. Defined.
+
+
 (** *** Values and Binary Operations *)
 
 (** Values are just local identifiers or natural numbers *)
@@ -67,6 +85,18 @@ Notation addr := Addr.t.
 Inductive val : Set :=
  | val_uid  : uid -> val
  | val_nat : nat -> val.
+
+Definition eq_dec_val: forall val1 val2: val, {val1 = val2} + {~(val1 = val2)}.
+Proof.
+  intros [uid1 | n1] [uid2 | n2];
+    try solve [right; intros H; inversion H].
+  destruct (eq_dec_uid uid1 uid2) as [uid_eq | uid_neq];
+    try solve [right; intros H; inversion H; apply uid_neq; trivial];
+    left; rewrite uid_eq; reflexivity.
+  destruct (Nat.eq_dec n1 n2) as [n_eq | n_neq];
+    try solve [right; intros H; inversion H; apply n_neq; trivial];
+    left; rewrite n_eq; reflexivity.
+Defined.
 
 (** All Vminus operations are binary arithmetic forms.  There are no
     unary operations, nor are there assembly-language-like [move]
@@ -81,6 +111,13 @@ Inductive bop : Set :=
  | bop_le  
  | bop_and.
 
+Definition eq_dec_bop: forall bop1 bop2: bop, {bop1 = bop2} + {~(bop1 = bop2)}.
+Proof.
+  intros [] [];
+    try solve [right; intros H; inversion H];
+    try solve [left; reflexivity].
+Defined.
+
 (** *** Basic block terminators *)
 
 (** Each basic block is a sequence of commands (defined next) ending
@@ -93,6 +130,25 @@ Inductive tmn : Set :=
 | tmn_cbr : val -> lbl -> lbl -> tmn    (* conditional branch *)
 | tmn_ret : tmn.                        (* return *)
 
+Definition eq_dec_tmn: forall tmn1 tmn2: tmn, {tmn1 = tmn2} + {~(tmn1 = tmn2)}.
+Proof.
+  intros [jmp_lbl1 | v1 if1 else1 |]
+         [jmp_lbl2 | v2 if2 else2 |];
+    try solve [right; intros H; inversion H];
+    try solve [left; reflexivity].
+  destruct (eq_dec_lbl jmp_lbl1 jmp_lbl2) as [Heq | Hneq];
+    try solve [right; intros H; inversion H; apply Hneq; trivial];
+    try solve [left; subst; reflexivity].
+  destruct (eq_dec_val v1 v2) as [v_eq | v_neq];
+    try solve [right; intros H; inversion H; apply v_neq; trivial];
+    try solve [left; subst; reflexivity].
+  destruct (eq_dec_lbl if1 if2) as [if_eq | if_neq];
+    try solve [right; intros H; inversion H; apply if_neq; trivial];
+    try solve [left; subst; reflexivity].
+  destruct (eq_dec_lbl else1 else2) as [else_eq | else_neq];
+    try solve [right; intros H; inversion H; apply else_neq; trivial];
+    try solve [left; subst; reflexivity].
+Defined.  
 
 (** *** Commands *)
 
@@ -103,6 +159,35 @@ terminators, and [load] and [store] operations. *)
 
 Definition phiarg := (lbl * val)%type.
 
+Definition eq_dec_phiarg:
+  forall phiarg1 phiarg2: phiarg, {phiarg1 = phiarg2} + {~(phiarg1 = phiarg2)}.
+Proof.
+  intros [lbl1 val1] [lbl2 val2].
+  destruct (eq_dec_lbl lbl1 lbl2) as [lbl_eq | lbl_neq];
+    try solve [right; intros H; inversion H; apply lbl_neq; trivial];
+    try solve [left; subst; reflexivity].
+  destruct (eq_dec_val val1 val2) as [val_eq | val_neq];
+    try solve [right; intros H; inversion H; apply val_neq; trivial];
+    try solve [left; subst; reflexivity].
+Defined.
+
+Definition eq_dec_list_phiarg:
+  forall l1 l2 : list phiarg, {l1 = l2} + {~(l1 = l2)}.
+Proof.
+  induction l1 as [| pa1 phiargs1].
+  - destruct l2; [left; reflexivity | right; intros H; inversion H].
+  - destruct l2 as [| pa2 phiargs2];
+      try solve [right; intros H; inversion H].
+    destruct (eq_dec_phiarg pa1 pa2) as [pa_eq | pa_neq];
+      try solve [right; intros H; inversion H; apply pa_neq; trivial];
+      try solve [left; subst; reflexivity].
+    subst.
+    specialize IHphiargs1 with (l2 := phiargs2).
+    destruct IHphiargs1 as [phiargs_eq | phiargs_neq];
+      try solve [right; intros H; inversion H; apply phiargs_neq; trivial].
+    left; subst; reflexivity.
+Defined.
+    
 (** Vminus Commands *)
 
 Inductive cmd : Set :=
@@ -112,10 +197,54 @@ Inductive cmd : Set :=
 | cmd_load  : addr -> cmd
 | cmd_store : addr -> val -> cmd.
 
+Definition eq_dec_cmd: forall cmd1 cmd2: cmd, {cmd1 = cmd2} + {~(cmd1 = cmd2)}.
+Proof.
+  intros [bop1 val1 right_val1 | phiargs1 | tmn1 | addr1 |
+          addr1 val1]
+         [bop2 val2 right_val2 | phiargs2 | tmn2 | addr2 |
+          addr2 val2];
+    try solve [right; intros H; inversion H];
+    try (destruct (eq_dec_list_phiarg phiargs1 phiargs2)
+          as [phiargs_eq | phiargs_neq];
+         try solve [left; subst; reflexivity];
+         try solve [right; intros H; inversion H; apply phiargs_neq; trivial]);
+    try (destruct (eq_dec_tmn tmn1 tmn2) as [tmn_eq | tmn_neq];
+         try solve [left; subst; reflexivity];
+         try solve [right; intros H; inversion H; apply tmn_neq; trivial]);
+    try (destruct (eq_dec_addr addr1 addr2) as [addr_eq | addr_neq];
+         try solve [left; subst; reflexivity];
+         try solve [right; intros H; inversion H; apply addr_neq; trivial];
+         try
+           (destruct (eq_dec_val val1 val2) as [val_eq | val_neq];
+            try solve [right; intros H; inversion H;
+                       apply val_neq; trivial];
+            try solve [left; subst; reflexivity])).
+  - destruct (eq_dec_bop bop1 bop2) as [bop_eq | bop_neq];
+      try solve [right; intros H; inversion H; apply bop_neq; trivial].
+    destruct (eq_dec_val val1 val2) as [val_eq | val_neq];
+      try solve [right; intros H; inversion H; apply val_neq; trivial];
+      destruct (eq_dec_val right_val1 right_val2)
+        as [right_val_eq | right_val_neq];
+      try solve [right; intros H;
+                 inversion H; apply right_val_neq; trivial].
+    subst; left; reflexivity.
+Defined.  
+
 (** An instruction associates a unique local identifier with one of the
     above commands. *)
 
 Definition insn := (uid * cmd)%type.
+
+Definition eq_dec_insn:
+  forall insn1 insn2: insn, {insn1 = insn2} + {~(insn1 = insn2)}.
+Proof.
+  intros [uid1 cmd1] [uid2 cmd2].
+  destruct (eq_dec_uid uid1 uid2) as [uid_eq | uid_neq];
+    try solve [right; intros H; inversion H; apply uid_neq; trivial].
+  destruct (eq_dec_cmd cmd1 cmd2) as [cmd_eq | cmd_neq];
+    try solve [right; intros H; inversion H; apply cmd_neq; trivial].
+  subst; left; reflexivity.
+Defined. 
 
 
 (* ####################################################### *)
@@ -208,11 +337,25 @@ Inductive le_pc : pc -> pc -> Prop :=
 Definition lt_pc (p1 p2:pc) : Prop :=
   le_pc p1 (incr_pc p2).
 
+Definition eq_dec_pc: forall p1 p2: pc, {p1 = p2} + {~(p1 = p2)}.
+Proof.
+  intros (lbl1, offset1) (lbl2, offset2).
+  destruct (eq_dec_lbl lbl1 lbl2) as [lbl_eq | lbl_neq];
+    try solve [right; intros H; inversion H;
+               exfalso; apply lbl_neq; trivial];
+  destruct (Nat.eq_dec offset1 offset2) as [offset_eq | offset_neq];
+    try solve [right; intros H; inversion H; apply offset_neq; trivial];
+    left; subst; reflexivity.
+Defined.
+
 (** The entry point of a block is offset [0]. *)
 
 Definition block_entry (l:lbl) : pc := (l, 0).
 Definition entry_of_pc (p:pc)  : pc := block_entry (fst p).
 
+
+(** * COMMENTED OUT *)
+(*
 (** ** Well-formed Control-flow Graphs *)
 
 (** FULL: Given the abstract characterization of program points, we need to
@@ -299,7 +442,9 @@ Module Type CFG.
     forall p', tmn_pc g p' -> forall p, le_pc p p' -> wf_pc g p.
 
 End CFG.
+*)
 
+(** * Commented out 
 (** ** Vminus Operational Semantics *)
 Module Make (Import Cfg:CFG).
 
@@ -995,7 +1140,9 @@ End OpsemCorrect.
 Export Opsem Typing OpsemCorrect.
 
 End Make.
+*)
 
+(** * Commented out 
 (** *** List-based CFG Implementation *)
 
 (**  One possible implementation of cfgs *)
@@ -1164,8 +1311,6 @@ Module ListCFG <: CFG.
     | Some found_block => nth_error found_block offset
     | None => None
     end.
-
-  Print NoDup.
   
   Lemma find_block_ok: forall (blks: list (lbl * list insn)) found_instrs (label: lbl),
       NoDup (List.map fst blks) -> 
@@ -1247,7 +1392,6 @@ Module ListCFG <: CFG.
               insn_at_pc g pc i <-> fetch g pc = Some i.
   Proof.
     intros [l blks] pc i wf_g.
-    Print wf_cfg'.
     inversion wf_g as
         [l' blks' nodup nodup_uid l_in_blks blks_not_empty [l_l' blks_blk]].
     destruct pc as [curr_label curr_offset].
@@ -1257,4 +1401,4 @@ Module ListCFG <: CFG.
   Qed.      
     
 End ListCFG.
-
+*)
