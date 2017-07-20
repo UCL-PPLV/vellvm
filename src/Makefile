@@ -6,7 +6,7 @@ COQLIBDIR = ../lib
 MLDIR = ml imp
 EXTRACTDIR = ml/extracted
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(COQLIBDIR)/paco/src Paco -R $(EXTRACTDIR) Extract -R ../lib/CompCert compcert -R ../lib/QuickChick/src QuickChick
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(COQLIBDIR)/paco/src Paco -R $(EXTRACTDIR) Extract -R ../lib/CompCert compcert
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
@@ -14,8 +14,8 @@ MENHIR=menhir
 CP=cp
 
 QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick CompilerQuickChick ImpCorrectnessTest
-IMPCOQFILES := Maps Imp ImpCEvalFun Compiler ImpCorrectness  
-COQFILES := Classes Util Ollvm_ast  Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform  $(IMPCOQFILES) DecidableEquality  DecidableProp
+IMPCOQFILES := Maps Imp ImpCEvalFun Compiler ImpCorrectness ImpOptimizer CompilerProp 
+COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality
 OLLVMFILES := 
 
 VFILES := $(COQFILES:%=coq/%.v)
