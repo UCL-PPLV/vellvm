@@ -84,20 +84,36 @@ Definition convertCFGtoLoopTreeBlock (c:cfg) := mkLTB c.(init) (BlockToListOfLea
 
 Definition convertLoopTreeBlocktoCFG (c:LoopTreeBlock) := mkCFG c.(inits) (ListOfLeavesToBlock c.(blkss)) c.(glbls).
 
-Theorem CFGConversion : forall c, convertLoopTreeBlocktoCFG(convertCFGtoLoopTreeBlock(c)) = c.
-Proof. intros. unfold convertCFGtoLoopTreeBlock, convertLoopTreeBlocktoCFG. induction c. simpl.  induction blks; simpl; eauto. induction a. simpl. symmetry. inversion IHblks. rewrite H0. rewrite H0. auto. Qed.
+Theorem CFGConversion :
+  forall c, convertLoopTreeBlocktoCFG(convertCFGtoLoopTreeBlock(c)) = c.
+Proof.
+intros. unfold convertCFGtoLoopTreeBlock, convertLoopTreeBlocktoCFG.
+induction c.
+simpl.
+induction blks; simpl; eauto.
+induction a.
+simpl. symmetry.
+inversion IHblks.
+rewrite H0 H0.
+auto.
+Qed.
 
 
+Definition DefLTBtoDefCFG (t:definition LoopTreeBlock) :=
+  (mk_definition cfg t.(df_prototype) t.(df_args) (convertLoopTreeBlocktoCFG t.(df_instrs))).
 
-
-
-Definition DefLTBtoDefCFG (t:definition LoopTreeBlock) := (mk_definition cfg t.(df_prototype) t.(df_args) (convertLoopTreeBlocktoCFG t.(df_instrs))).
-
-Definition DefCFGtoDefLTB (t:definition cfg) := (mk_definition LoopTreeBlock t.(df_prototype) t.(df_args) (convertCFGtoLoopTreeBlock t.(df_instrs))).
+Definition DefCFGtoDefLTB (t:definition cfg) :=
+  (mk_definition LoopTreeBlock t.(df_prototype) t.(df_args) (convertCFGtoLoopTreeBlock t.(df_instrs))).
 
 
 Theorem DefCFGConversion : forall c, DefLTBtoDefCFG(DefCFGtoDefLTB(c)) = c.
-Proof. intros. unfold DefLTBtoDefCFG, DefCFGtoDefLTB. induction c; simpl. induction df_instrs; simpl; eauto. rewrite CFGConversion; eauto; simpl. Qed.
+Proof.
+intros.
+unfold DefLTBtoDefCFG, DefCFGtoDefLTB.
+induction c; simpl.
+induction df_instrs; simpl; eauto.
+rewrite CFGConversion; eauto; simpl.
+Qed.
 
 
 
@@ -106,29 +122,56 @@ Definition ListDefCFGtoListDefLTB (t:list (definition cfg)) := map DefCFGtoDefLT
 
 
 Theorem ListDefConversion : forall c, ListDefLTBtoListDefCFG(ListDefCFGtoListDefLTB(c)) = c.
-Proof. intros. unfold ListDefLTBtoListDefCFG, ListDefCFGtoListDefLTB. simpl. induction c; simpl; eauto.  rewrite DefCFGConversion; simpl; eauto. rewrite IHc; eauto; simpl.
+Proof.
+intros.
+unfold ListDefLTBtoListDefCFG, ListDefCFGtoListDefLTB.
+simpl; induction c; simpl; eauto.
+rewrite DefCFGConversion; simpl; eauto.
+rewrite IHc; eauto.
 Qed.
 
 
+Definition MLTBtoMCFG (t:modul LoopTreeBlock) : mcfg :=
+  mk_modul cfg t.(m_name)
+           t.(m_target) t.(m_datalayout)
+           t.(m_globals)
+           t.(m_declarations) (ListDefLTBtoListDefCFG t.(m_definitions)).
 
-Definition MLTBtoMCFG (t:modul LoopTreeBlock) : mcfg := mk_modul cfg t.(m_name) t.(m_target) t.(m_datalayout) t.(m_globals) t.(m_declarations) (ListDefLTBtoListDefCFG t.(m_definitions)).
-Definition MCFGtoMLTB (t:modul cfg) := mk_modul LoopTreeBlock t.(m_name) t.(m_target) t.(m_datalayout) t.(m_globals) t.(m_declarations) (ListDefCFGtoListDefLTB t.(m_definitions)).
+Definition MCFGtoMLTB (t:modul cfg) :=
+  mk_modul LoopTreeBlock t.(m_name) t.(m_target)
+           t.(m_datalayout) t.(m_globals) t.(m_declarations)
+           (ListDefCFGtoListDefLTB t.(m_definitions)).
 
 (*
 Theorem MCFGConversion : forall c, MLTBtoMCFG(MCFGtoMLTB(c)) = c.
 Proof. intros. unfold MLTBtoMCFG, MCFGtoMLTB; simpl; eauto. rewrite ListDefConversion. simpl. induction c; simpl; eauto; simpl. Qed.
 *)
 
-Definition parseunparse (t:modul cfg) : modul cfg := MLTBtoMCFG (MCFGtoMLTB t).
-Print stepD.
+Definition parse_unparse (t:modul cfg) : modul cfg := MLTBtoMCFG (MCFGtoMLTB t).
+(* Print stepD. *)
 
-Theorem parseunparsecorrect : forall c s, stepD (parseunparse c) s = stepD c s.
-Proof. intros. destruct s. destruct p. destruct c. simpl. unfold parseunparse. simpl. unfold MLTBtoMCFG, MCFGtoMLTB.
-simpl. unfold ListDefLTBtoListDefCFG, ListDefCFGtoListDefLTB. simpl. 
+Theorem parse_unparse_correct : forall c s, stepD (parse_unparse c) s = stepD c s.
+Proof.
+move=>c[[p e]]s. 
+case: c; intros.
+rewrite /parse_unparse/MLTBtoMCFG/MCFGtoMLTB. 
+rewrite ![Ollvm_ast.m_name _]/= ![Ollvm_ast.m_definitions _]/=
+        ![Ollvm_ast.m_declarations _]/= ![Ollvm_ast.m_target _]/=
+        ![Ollvm_ast.m_datalayout _]/= ![Ollvm_ast.m_globals _]/=.
+elim: m_definitions p e s=>//[cfg rest Hi]p0 e0 s0.
+rewrite [ListDefLTBtoListDefCFG _] /=.
 
-unfold DefLTBtoDefCFG, DefCFGtoDefLTB. simpl. unfold convertLoopTreeBlocktoCFG, convertCFGtoLoopTreeBlock.
-unfold ListOfLeavesToBlock, BlockToListOfLeaves. simpl. eauto.
-induction blks. simpl. eauto.
+
+(* unfold MLTBtoMCFG, MCFGtoMLTB. *)
+(* simpl. *)
+(* unfold ListDefLTBtoListDefCFG, ListDefCFGtoListDefLTB. *)
+(* simpl.  *)
+(* unfold DefLTBtoDefCFG, DefCFGtoDefLTB. simpl. *)
+(* unfold convertLoopTreeBlocktoCFG, convertCFGtoLoopTreeBlock. *)
+(* unfold ListOfLeavesToBlock, BlockToListOfLeaves. *)
+(* simpl. eauto. *)
+(* induction blks. simpl. *)
+(* eauto. *)
 
 Admitted.
 
