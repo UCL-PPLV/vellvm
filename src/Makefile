@@ -19,8 +19,8 @@ COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSeman
 OLLVMFILES := 
 LOOPFILES := Loop
 
-VFILES := $(COQFILES:%=coq/%.v) $(COQFILES:%=coq/LoopIdentification/%.v)
-VOFILES := $(COQFILES:%=coq/%.vo) $(COQFILES:%=coq/LoopIdentification/%.vo)
+VFILES := $(COQFILES:%=coq/%.v) $(LOOPFILES:%=coq/LoopIdentification/%.v)
+VOFILES := $(COQFILES:%=coq/%.vo) $(LOOPFILES:%=coq/LoopIdentification/%.vo)
 
 EXPERIMENT_FILES := MiniLLVM Vellvm Extract_Haskell_Ollvm_ast Experiments
 
