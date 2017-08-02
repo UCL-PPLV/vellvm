@@ -147,12 +147,21 @@ Theorem MCFGConversion : forall c, MLTBtoMCFG(MCFGtoMLTB(c)) = c.
 Proof. intros. unfold MLTBtoMCFG, MCFGtoMLTB; simpl; eauto. rewrite ListDefConversion. simpl. induction c; simpl; eauto; simpl. Qed.
 *)
 
-Definition parse_unparse (t:modul cfg) : modul cfg := MLTBtoMCFG (MCFGtoMLTB t).
+Definition parse_unparse (t: modul cfg) : modul cfg := MLTBtoMCFG (MCFGtoMLTB t).
 (* Print stepD. *)
+
+Theorem parse_unparse_eq c : parse_unparse c = c.
+Proof.
+Admitted.
+
+
 
 Theorem parse_unparse_correct : forall c s, stepD (parse_unparse c) s = stepD c s.
 Proof.
-move=>c[[p e]]s. 
+move=>c[[p e]]s.
+by rewrite parse_unparse_eq.
+Qed.
+
 case: c; intros.
 rewrite /parse_unparse/MLTBtoMCFG/MCFGtoMLTB. 
 rewrite ![Ollvm_ast.m_name _]/= ![Ollvm_ast.m_definitions _]/=
@@ -160,7 +169,17 @@ rewrite ![Ollvm_ast.m_name _]/= ![Ollvm_ast.m_definitions _]/=
         ![Ollvm_ast.m_datalayout _]/= ![Ollvm_ast.m_globals _]/=.
 elim: m_definitions p e s=>//[cfg rest Hi]p0 e0 s0.
 rewrite [ListDefLTBtoListDefCFG _] /=.
+case: p0=>fn0 bk0 pt0.
+rewrite /stepD.
+rewrite /trywith/fetch.
 
+
+set F := (find_function _ fn0).
+
+
+
+case (find_function _ fn0)/ last first.
+- rewrite [do _ <- _ ; _]/=.
 
 (* unfold MLTBtoMCFG, MCFGtoMLTB. *)
 (* simpl. *)
@@ -232,7 +251,9 @@ Proof. intros. unfold BlockToLeaf, LeafToBlock. auto. induction c. auto. Qed.
 Fixpoint ListOfBlocksToLoopHelper (b:list block) (l:list Leaf) (loops: list Leaf) :=
 match b with
   | nil => MyNode l loops
-  | head::tail => if LoopTesting head then ListOfBlocksToLoopHelper tail ([BlockToLeaf head] ++ l) loops else ListOfBlocksToLoopHelper tail l ([BlockToLeaf head] ++ loops)
+  | head::tail => if LoopTesting head
+                  then ListOfBlocksToLoopHelper tail ([BlockToLeaf head] ++ l) loops
+                  else ListOfBlocksToLoopHelper tail l ([BlockToLeaf head] ++ loops)
 end.
 
 
