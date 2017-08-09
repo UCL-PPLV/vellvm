@@ -17,10 +17,14 @@ QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick CompilerQuickC
 IMPCOQFILES := Maps Imp ImpCEvalFun Compiler ImpCorrectness ImpOptimizer CompilerProp 
 COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality
 OLLVMFILES := 
-LOOPFILES := Loop
 
-VFILES := $(COQFILES:%=coq/%.v) $(LOOPFILES:%=coq/LoopIdentification/%.v)
-VOFILES := $(COQFILES:%=coq/%.vo) $(LOOPFILES:%=coq/LoopIdentification/%.vo)
+REASONINGFRAMEWORK := OptimisationEffects OptimisationStepSemantics OptimisationHints  
+REASONINGFRAMEWORKTESTS := Test1 Test2 Test3 Test4 Test5 Test6 Test7 Test8 Test9 Test10
+OPTIMISATIONS := SimpleConversion DoNothing AddEmptyBlock DeadInstructionElimination
+
+
+VFILES := $(COQFILES:%=coq/%.v) $(REASONINGFRAMEWORK:%=coq/ReasoningFramework/%.v) $(OPTIMISATIONS:%=coq/ReasoningFramework/Optimisations/%.v)
+VOFILES := $(COQFILES:%=coq/%.vo) $(REASONINGFRAMEWORK:%=coq/ReasoningFramework/%.vo) $(OPTIMISATIONS:%=coq/ReasoningFramework/Optimisations/%.vo)
 
 EXPERIMENT_FILES := MiniLLVM Vellvm Extract_Haskell_Ollvm_ast Experiments
 
