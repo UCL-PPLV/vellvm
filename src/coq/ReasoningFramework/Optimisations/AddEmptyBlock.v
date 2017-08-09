@@ -43,3 +43,4 @@ unfold optimize in H0.  simpl in *.  rewrite H in H0.
 apply remove_some in H0.  rewrite H0 in H1.  rewrite <- H2. rewrite <- H1. auto.
 rewrite <- H1; rewrite  <- H2. unfold sem.
 unfold step_sem.
+Admitted.
