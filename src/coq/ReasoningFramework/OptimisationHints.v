@@ -51,10 +51,8 @@ Definition correct (P : modul (list block) -> Prop) (o:optimization) :=
     mcfg_of_modul (optimize m o) = Some m_opt_semantic ->forall s a b, (sem m_semantic s) = a -> (sem m_opt_semantic s) = b ->
  trace_equiv a b. 
 
-
-
-Theorem remove_some : forall (a b : mcfg), a = b <-> Some a = Some b.
-Proof. intros. split; intros; inversion H; auto. Qed.
+Theorem remove_some (a b : mcfg) : a = b <-> Some a = Some b.
+Proof. by split=>[->|[]]. Qed.
 
 
 Theorem trace_equiv_lemma: forall (a:Trace ()), trace_equiv a a.
