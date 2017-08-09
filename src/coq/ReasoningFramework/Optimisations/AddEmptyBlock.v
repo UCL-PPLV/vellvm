@@ -45,6 +45,13 @@ move: H0; rewrite /optimize/=.
 rewrite/mcfg_of_modul/=.
 case X : (map_option _ _ )=>[v|]//; case=>Z.
 subst  m_opt_semantic. 
+rewrite map_option_map in X.
+
+Search _ (map_option).
+move/map_option_nth: X=>/=X.
+rewrite /globals/= in X.
+
+Print nth_error.
 
 have E : v = ??? (* semthing (m_definitions m) *)
 
