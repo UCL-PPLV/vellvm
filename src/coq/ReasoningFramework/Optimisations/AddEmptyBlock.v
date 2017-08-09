@@ -46,7 +46,7 @@ rewrite/mcfg_of_modul/=.
 case X : (map_option _ _ )=>[v|]//; case=>Z.
 subst  m_opt_semantic. 
 
-have E : v = ??? (* semthing(m_definitions m) *)
+have E : v = ??? (* semthing (m_definitions m) *)
 
                [seq {|  df_prototype := df_prototype d; df_args := df_args d; df_instrs := a |}
                | i <- m_definitions m].
