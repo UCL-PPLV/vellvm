@@ -52,7 +52,7 @@ move/map_option_nth: X=>/=X.
 rewrite /globals/= in X.
 
 Print nth_error.
-
+(*
 have E : v = ??? (* semthing (m_definitions m) *)
 
                [seq {|  df_prototype := df_prototype d; df_args := df_args d; df_instrs := a |}
@@ -82,3 +82,4 @@ apply: IHm_definitions=>//.
 
 rewrite /optimize/= in IHm_definitions.
 Admitted.
+*)
