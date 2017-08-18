@@ -40,14 +40,43 @@ Definition add_empty_blocks (d:definition (list block)) :=
 Print modul.
 
 
-
-Definition new_init (d : definition (seq block)) :=
-match (df_instrs d) with
-  | [::] => Some (Raw 1)
-  | b :: _ => Some (blk_id b)
-end.
-
-Definition Smallfunction m x := (
+Definition original m v := ( map_option
+      (fun x : definition (seq block) =>
+       match
+         match
+           match (df_instrs x ++ emptyblock)%SEQ with
+           | [::] => None
+           | b :: _ => Some (blk_id b)
+           end
+         with
+         | Some a =>
+             Some
+               {|
+               init := a;
+               blks := df_instrs x ++ emptyblock;
+               glbl := (globals
+                          {|
+                          m_name := m_name m;
+                          m_target := m_target m;
+                          m_datalayout := m_datalayout m;
+                          m_globals := m_globals m;
+                          m_declarations := m_declarations m;
+                          m_definitions := [seq add_empty_blocks i
+                                              | i <- m_definitions m] |} ++
+                        List.map [eta ID_Local] (df_args x))%list |}
+         | None => None
+         end
+       with
+       | Some a =>
+           Some
+             {|
+             df_prototype := df_prototype x;
+             df_args := df_args x;
+             df_instrs := a |}
+       | None => None
+       end) (m_definitions m) = Some v).
+Print m_definitions.
+Definition Smallfunction m x:= (
        match
          match init_of_definition (add_empty_blocks x) with
          | Some a =>
@@ -78,12 +107,13 @@ Definition Smallfunction m x := (
        end).
 
 
+Definition apply_small_function m v := map_option (Smallfunction m) (m_definitions m) = Some v.
 
-Definition new_init_v1 (d : definition (seq block)) :=
-match (df_instrs d) with
-  | [::] =>  (Raw 1)
-  | b :: _ =>  (blk_id b)
-end.
+Theorem original_to_smallfunction : forall m v, original m v <-> apply_small_function m v.
+Proof. 
+move => m v; split; move => H => //. Qed.
+
+
 
 
 Definition Smallfunction1 m x := 
@@ -91,7 +121,10 @@ Definition Smallfunction1 m x :=
              df_prototype := df_prototype x;
              df_args := df_args x;
              df_instrs := {|
-               init := new_init_v1 x;
+               init := match (df_instrs x) with
+  | [::] =>  (Raw 1)
+  | b :: _ =>  (blk_id b)
+end;
                blks := df_instrs x ++ emptyblock;
                glbl := (globals
                           {|
@@ -104,68 +137,71 @@ Definition Smallfunction1 m x :=
                                               | i <- m_definitions m] |} ++
                         List.map [eta ID_Local] (df_args x))%list |}|}.
 
+Definition Smallfunction2 (c:definition cfg) := Some (c).
 
-(*
-Definition Smallfunction2 m x := 
-           Some (Smallfunction1 m x).
-
-Theorem Smallfunction_equiv_2_3 : forall m v, map (Smallfunction1 m) (m_definitions m) = v <-> map_option (Smallfunction2 m) (m_definitions m) = Some v.
-Proof. move => m v. split; intros. destruct m. simpl. 
-(*
-rewrite /Smallfunction3/= in H.
-rewrite /Smallfunction2/=.
-rewrite /Smallfunction3/=.
-rewrite /add_empty_blocks/=.
-rewrite /new_init_v1/=.
-rewrite /new_init_v1/= in H.
-rewrite /add_empty_blocks/= in H. simpl. simpl in *.
-rewrite /map_option/=.
- simpl. 
-destruct m_definitions; simpl in H => //. 
-inversion H. auto.
-simpl. simpl in H.
-destruct d. simpl. simpl in *.
-destruct df_instrs. simpl. simpl in H.   
-*)
-Admitted.
-*)
-
-
-
-Theorem remove_some_definition_definition_cfg : forall (a b: definition cfg), Some a = Some b <-> a = b.
-Proof. move => a b => //. split; move => H; inversion H => //. Qed.
-
-Theorem remove_some_definition_definition_cfg1 : forall (a b: seq (definition cfg)), Some a = Some b <-> a = b.
-Proof. move => a b => //. split; move => H; inversion H => //. Qed.
-
-
-
-Theorem eq_in_option_map : forall a (f1 : definition (seq block) -> option (definition cfg)) (f2 : definition (seq block) -> (definition cfg)) s v,
-      f1 a = Some (f2 a) -> (map_option f1 s = Some v <-> map f2 s = v).
-Proof. Admitted.
+Definition applyfunction12 m v := map_option (fun t => (Smallfunction2 (Smallfunction1 m t))) (m_definitions m) = Some v.
 
 
 
 
-Theorem function_equiv : forall m x v,  Smallfunction1 m x = v <->  Smallfunction m x = Some v.
-Proof. move => m x v. 
-rewrite /Smallfunction/=.
-rewrite /init_of_definition/=.
-split; move => H; rewrite /Smallfunction1/= in H;
-rewrite /new_init_v1/= in H.
-induction x =>//. simpl. simpl in *. induction df_instrs => //. simpl => //. apply remove_some_definition_definition_cfg => //.
-simpl. simpl in * => //. apply remove_some_definition_definition_cfg => //.
-rewrite /Smallfunction1/=;
-rewrite /new_init_v1/=. 
-induction x => //. induction df_instrs => //. simpl in *; simpl. apply remove_some_definition_definition_cfg in H => //. simpl. simpl in *.
-apply remove_some_definition_definition_cfg in H => //. Qed.
-
-Print map_option.
+Theorem experiment1 : forall m, (fun t => Smallfunction m t)  = (fun y => (Smallfunction2 (Smallfunction1 m y))) .
+Proof. move => m. induction m. simpl. rewrite /Smallfunction2/=.
+(*Insert old proof here*) 
+ Admitted.
 
 
 
-Theorem map_equiv : forall m v, (map_option (Smallfunction m) (m_definitions m) = Some v <-> map (Smallfunction1 m) (m_definitions m) = v).
-Proof. Admitted.
+Theorem smallfunction_to_smallfunction12 : forall m v, apply_small_function m v <-> applyfunction12 m v.
+Proof. move => m v. split;
+ move => H.
+rewrite /applyfunction12/=.
+rewrite <- experiment1.
+rewrite /apply_small_function/= in H. auto.
+rewrite  /applyfunction12/= in H.
+rewrite /apply_small_function/=.
+rewrite <- experiment1 in H. auto. Qed.
+
+
+
+Definition map_option_map_function m v := map_option (Smallfunction2) (List.map (Smallfunction1 m) (m_definitions m)) = Some v.
+
+
+Theorem testetstestest  : forall x l, map_option (Smallfunction2) (List.map (Smallfunction1 x) l) = map_option (fun t => (Smallfunction2 (Smallfunction1 x t))) l. Proof.
+move => x  l. rewrite map_option_map. auto. Qed.
+
+
+Theorem smallfunction12_map_option_map : forall m v, applyfunction12 m v <-> map_option_map_function m v.
+Proof. move => m v. rewrite /applyfunction12/=.
+rewrite /map_option_map_function/=. rewrite map_option_map => //. Qed.
+
+
+
+
+Theorem map_id : forall (l:seq (definition cfg)), map id l = l.
+Proof. move => l. induction l => //. inversion IHl. eauto. induction a. simpl. rewrite IHl. rewrite IHl. eauto.
+Qed.
+
+Theorem Smallfunction_iden : forall l, map_option (Smallfunction2) l = Some l.
+Proof. move => l. induction l; simpl. auto.
+  -destruct (map_option Smallfunction2 l). simpl. inversion IHl. auto. auto. inversion IHl. Qed.
+Print id.
+
+
+
+
+Theorem map_option_to_id : forall m v, map_option_map_function m v <-> (List.map (Smallfunction1 m) (m_definitions m)) = v.
+Proof. move => m v. split; move => H => //. rewrite /map_option_map_function/= in H. rewrite Smallfunction_iden in H. inversion H => //. 
+rewrite /map_option_map_function/=. rewrite Smallfunction_iden. inversion H => //. Qed.
+
+
+
+
+
+Theorem final_map : forall m v, original m v <-> (List.map (Smallfunction1 m) (m_definitions m)) = v.
+Proof. move => m v; split; move => H. rewrite <- map_option_to_id. rewrite <- smallfunction12_map_option_map.
+rewrite <- smallfunction_to_smallfunction12. rewrite <- original_to_smallfunction => //.
+rewrite original_to_smallfunction. rewrite smallfunction_to_smallfunction12. rewrite smallfunction12_map_option_map.
+rewrite map_option_to_id => //. Qed.
 
 
 
@@ -181,7 +217,7 @@ subst  m_opt_semantic.
 rewrite map_option_map in X.
 rewrite /cfg_of_definition/= in X.
 rewrite /init_of_definition/= in X.
-apply map_equiv in X.
+apply final_map in X.
 rewrite <- X.
 destruct m; simpl in * => //;
 induction m_definitions => //. 
