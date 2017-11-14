@@ -13,22 +13,11 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-<<<<<<< HEAD
-QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick CompilerQuickChick ImpCorrectnessTest
-IMPCOQFILES := Maps Imp ImpCEvalFun Compiler ImpCorrectness ImpOptimizer CompilerProp 
-COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality
-=======
 COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp
->>>>>>> 1c17711c6d2d75e459d5679568823952fe9498ef
 OLLVMFILES := 
 
-REASONINGFRAMEWORK := OptimisationEffects OptimisationStepSemantics OptimisationHints  
-REASONINGFRAMEWORKTESTS := Test1 Test2 Test3 Test4 Test5 Test6 Test7 Test8 Test9 Test10
-OPTIMISATIONS := SimpleConversion DoNothing AddEmptyBlock DeadInstructionElimination
-
-
-VFILES := $(COQFILES:%=coq/%.v) $(REASONINGFRAMEWORK:%=coq/ReasoningFramework/%.v) $(OPTIMISATIONS:%=coq/ReasoningFramework/Optimisations/%.v)
-VOFILES := $(COQFILES:%=coq/%.vo) $(REASONINGFRAMEWORK:%=coq/ReasoningFramework/%.vo) $(OPTIMISATIONS:%=coq/ReasoningFramework/Optimisations/%.vo)
+VFILES := $(COQFILES:%=coq/%.v)
+VOFILES := $(COQFILES:%=coq/%.vo)
 
 all:
 	@test -f .depend || $(MAKE) depend
@@ -92,20 +81,4 @@ clean:
 	rm -rf output
 	rm -f vellvm
 
-<<<<<<< HEAD
-qc:
-	cp coq/Makefile_QuickChick coq/Makefile
-	cp coq/_CoqProject_QuickChick coq/_CoqProject
-	$(foreach f, $(EXPERIMENT_FILES), mv coq/$(f).v coq/$(f).bak;)
-	cd coq; echo "Entering coq/"; quickChick -top Vellvm -v
-	$(foreach f, $(EXPERIMENT_FILES), mv coq/$(f).bak coq/$(f).v;)
-
-restore:
-	rm coq/Makefile
-	rm coq/_CoqProject
-	$(foreach f, $(EXPERIMENT_FILES), mv coq/$(f).bak coq/$(f).v;)
-
 -include .depend
-=======
--include .depend
->>>>>>> 1c17711c6d2d75e459d5679568823952fe9498ef
