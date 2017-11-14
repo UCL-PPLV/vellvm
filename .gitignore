@@ -40,6 +40,7 @@ src/ml/extracted/STAMP
 src/.depend
 /lib/paco
 /lib/CompCert
+<<<<<<< HEAD
 /lib/QuickChick
 
 # -----------------------------------------------------------------------------
@@ -56,3 +57,5 @@ cv/*.out
 *.synctex.gz
 *.out.ps
 .#*
+=======
+>>>>>>> 1c17711c6d2d75e459d5679568823952fe9498ef

@@ -13,9 +13,13 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
+<<<<<<< HEAD
 QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick CompilerQuickChick ImpCorrectnessTest
 IMPCOQFILES := Maps Imp ImpCEvalFun Compiler ImpCorrectness ImpOptimizer CompilerProp 
 COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality
+=======
+COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp
+>>>>>>> 1c17711c6d2d75e459d5679568823952fe9498ef
 OLLVMFILES := 
 
 REASONINGFRAMEWORK := OptimisationEffects OptimisationStepSemantics OptimisationHints  
@@ -25,8 +29,6 @@ OPTIMISATIONS := SimpleConversion DoNothing AddEmptyBlock DeadInstructionElimina
 
 VFILES := $(COQFILES:%=coq/%.v) $(REASONINGFRAMEWORK:%=coq/ReasoningFramework/%.v) $(OPTIMISATIONS:%=coq/ReasoningFramework/Optimisations/%.v)
 VOFILES := $(COQFILES:%=coq/%.vo) $(REASONINGFRAMEWORK:%=coq/ReasoningFramework/%.vo) $(OPTIMISATIONS:%=coq/ReasoningFramework/Optimisations/%.vo)
-
-EXPERIMENT_FILES := MiniLLVM Vellvm Extract_Haskell_Ollvm_ast Experiments
 
 all:
 	@test -f .depend || $(MAKE) depend
@@ -90,6 +92,7 @@ clean:
 	rm -rf output
 	rm -f vellvm
 
+<<<<<<< HEAD
 qc:
 	cp coq/Makefile_QuickChick coq/Makefile
 	cp coq/_CoqProject_QuickChick coq/_CoqProject
@@ -103,3 +106,6 @@ restore:
 	$(foreach f, $(EXPERIMENT_FILES), mv coq/$(f).bak coq/$(f).v;)
 
 -include .depend
+=======
+-include .depend
+>>>>>>> 1c17711c6d2d75e459d5679568823952fe9498ef
