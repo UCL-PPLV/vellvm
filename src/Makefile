@@ -14,10 +14,11 @@ MENHIR=menhir
 CP=cp
 
 COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp
+OPTIMISATIONFILES := pacoproofs
 OLLVMFILES := 
 
-VFILES := $(COQFILES:%=coq/%.v)
-VOFILES := $(COQFILES:%=coq/%.vo)
+VFILES := $(COQFILES:%=coq/%.v) $(OPTIMISATIONFILES:%=coq/optimisations/%.v)
+VOFILES := $(COQFILES:%=coq/%.vo) $(OPTIMISATIONFILES:%=coq/optimisations/%.vo)
 
 all:
 	@test -f .depend || $(MAKE) depend
