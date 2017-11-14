@@ -6,21 +6,16 @@ Require Import List.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-
+(*Consider the following CoInductive stream*)
 
 
 CoInductive stream A :=
   | ccons : A -> stream A -> stream A.
 
 
-(* Bisimulation proofs on CoInductive traces essentially work all the same way:
-  1. Unroll either side by the required number of steps until the inner most value is equal
-  2. Use constructors until the goal is found
-  3. Apply CoInductive hypothesis.*)
 
 
-
-(*These are the constructors required for step 2.*)
+(*Seq gen provides us with .*)
 Inductive seq_gen A seq : stream A -> stream A -> Prop :=
   | seq_gen1 : forall n s1 s2 (R : seq s1 s2 : Prop), seq_gen seq (ccons n s1) (ccons n s2)
   | seq_gen2 : forall n s1 s2 (R : seq s1 s2 : Prop), seq_gen seq s1 (ccons n s2)
@@ -28,7 +23,7 @@ Inductive seq_gen A seq : stream A -> stream A -> Prop :=
 .
 Hint Constructors seq_gen.
 
-(*essential for the folding*)
+(*essential for the accumulating*)
 CoInductive seq A : stream A -> stream A -> Prop :=
   | seq_fold : forall s1 s2, seq_gen seq s1 s2 -> seq s1 s2.
 
@@ -38,35 +33,97 @@ CoInductive seq A : stream A -> stream A -> Prop :=
 Definition seq' {A} (s1 s2:stream A) := paco2 (@seq_gen A) bot2 s1 s2.
 Hint Unfold seq'.
 
-(*Essential for Paco to work*)
+(*Essential monotonicity proof for Paco to work*)
 Lemma seq_gen_mon: forall {X}, monotone2 (@seq_gen X). Proof. pmonauto. Qed.
 Hint Resolve seq_gen_mon : paco.
 
 
+
+(*Consider the following two functions*)
 CoFixpoint adder n := ccons n (adder (S n)).
 CoFixpoint adder1 n := ccons n (adder1 (S (S n))).
+
+
 (*Coq will not execute any function which it deems to not terminate.
-However, it is possible to get 
+However, it is possible to calculate certain values by the use of certain tricks*)
+
+(*Let's try to execute a CoFix function*)
 
 
+Eval compute in adder 1.
+(*     = (cofix adder (n : nat) : stream nat := ccons n (adder (S n))) 1
+     : stream nat
+*)
 
 
+Eval compute in adder1 1.
+(*     = (cofix adder1 (n : nat) : stream nat := ccons n (adder1 (S (S n)))) 1
+     : stream nat
+*)
 
+(*Coq deems every Cofixpoint function not to terminate, therefore it won't execute them*)
 
+(*Consider the following functions which operate on streams: *)
 
+Definition hd A (s:stream A) :=
+match s with
+  | ccons a _ => a
+end.
 
+Definition tl A (s:stream A) :=
+match s with
+  | ccons _ a => a
+end.
+
+Fixpoint approx A (n:nat) (s:stream A) :=
+match n with
+  | 0 => nil
+  | S a => cons (hd s) (approx a (tl s))
+end.
 
 Definition unroll_one A (s:stream A) :=
   match s with
   | ccons n s' => ccons n s'
   end.
 
+
+(*Coq regards every definition or fixpoint function (which doesn't return a cofixpoint function) to terminate, therefore it will calculate the results*)
+
+
+Eval compute in hd (adder 1).
+Eval compute in hd (adder1 1).
+
+
+(*tl returns a cofixpoint*)
+Eval compute in tl (adder 1).
+Eval compute in tl (adder1 1).
+
+
+
+(*Arguably the most interesting of them all is approx. Approx allows us to calculate the first n items of a CoFixpoint*)
+
+Eval compute in approx 9 (adder 0).
+Eval compute in approx 5 (adder1 0).
+(*As we see, every second item of adder matchs one of adder1. This will be useful information for later*)
+
+(*Another useful trick is the use of unroll_one + simpl in order to "unroll" one single element of a CoFixpoint function*)
 Lemma unroll_one_eq : forall (s:stream nat), s = unroll_one s.
 Proof.
   destruct s; auto.
 Qed.
 
 
+Lemma unroll_one_adder : forall n, adder n = ccons n (adder (S n)).
+Proof. intros. rewrite unroll_one_eq. simpl. auto. Qed.
+
+
+(*This "trick" is incredibly useful because it exposes individual values*) 
+
+
+(* Bisimulation proofs on CoInductive traces essentially work all the same way:
+  1. Unroll either side by the required number of steps until the inner most value is equal
+  2. Use constructors until the goal is found
+  3. Apply CoInductive hypothesis.*)
 
 
 
