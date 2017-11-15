@@ -94,7 +94,7 @@ Definition blk_entry_id (b:block) : instr_id := fallthrough (blk_code b) (blk_te
 
 Definition blk_entry_pc (fid:function_id) (b:block) :=
   mk_pc fid (blk_id b) (blk_entry_id b).
-
+Print pc.
 Definition blk_term_pc (fid:function_id) (b:block) :=
   mk_pc fid (blk_id b) (blk_term_id b).
 
