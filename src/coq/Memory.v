@@ -15,7 +15,7 @@ Export SS.
 
 Definition memory := list dvalue.
 Definition undef := DV VALUE_Undef.
-
+Print state.
 Definition mem_step {X} (e:effects X) (m:memory) :=
   match e with
   | Alloca t k =>
