@@ -163,6 +163,8 @@ match t with
   | Tau a b => Tau a b
 end.
 
+
+(*
 Definition unroll_effects A (e:effects A) :=
 match e with
   | Alloca a b => Alloca a b
@@ -170,7 +172,7 @@ match e with
 
 end.
 
-
+*)
 
 
 Lemma stepD_equiv : forall CFG s, optimisedstepD CFG s = stepD CFG s.

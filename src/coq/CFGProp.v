@@ -340,11 +340,6 @@ Inductive wf_cmd (g:cfg) (p:pt) : cmd -> Prop :=
 
    - also, somewhere probably need that globals and function parameters are distinct
  *)
-
-Definition wf_cfg (CFG : cfg) : Prop :=
-  pt_exists CFG (init CFG)
-  /\ forall p, ~ edge_pt CFG p (init CFG)            
-  /\ (forall p cmd, (code CFG p) = Some cmd -> wf_cmd CFG p cmd)
 .
 
             

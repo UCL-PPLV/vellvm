@@ -1,13 +1,3 @@
-(*
-   - the initial pt denotes a command  
-   - fallthrough closure: each fallthrough pt maps to a command 
-   - jump closure: each label used in a terminator leads to a
-     block within the same function body.
-   - every use of an identifier is dominated by the id's definition
-   - no identifier is defined multiple times
-*)
-
-
 Require Import ZArith List String Omega.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util.
 
@@ -18,54 +8,87 @@ Set Contextual Implicit.
 
 
 
+(*********Essential: Dominator analysis*********)
+
+
+
+
 (*
+Basic definitions:
+Given a graph G with entry E.
 
-(*Fetches an instruction given a MCFG + PC*)
-Print fetch.
-
-(*An instruction exists in a CFG at p*)
-Definition pt_exists (CFG : mcfg) (p:pc) : Prop :=
-  exists cmd, fetch CFG p = Some cmd.
-
-
-Print cmd.
-Print incr_pc.
-Print cmd.
-
-
-Inductive edge_pt (g:mcfg) : pc -> pc -> Prop :=
-(*There exists a step instruction at point p, incrementing p generates another q implies there exists an edge relation between p and q.*)
-| edge_pt_S : forall p q i,
-    fetch g p = Some (Step i) -> incr_pc g p = Some q -> edge_pt g p q
-| edge_pt_J : forall p q i,
-    fetch g p = Some (Term i) -> incr_pc g p = Some q -> edge_pt g p q.
-Print incr_pc.
-
-Print phi.
- 
-
-
-
-
-
-(*Well-formed code*)
-*)
-(*
-Well-formed block
-  -No identifier is defined multiple times
-  -Every use of an identifier is dominated by the id's definition
-  -Every use of fallthrough maps a command
+A block L is reachable if there is a path from the entry pf G to L.
+A block L1 dominates L2, if for every path p from e to L2, L1 is a member of P.
+A block L1 strictly dominates L2, if path P from e to L2, L1 != L2 /\ L2 is a member of P.
 *)
 
 
-(*Well-formed CFG*)
+(*
+Basic lemmas:
+Lemma 1: If L1 strictly dominates L2, then L1 dominates L2
+Lemma 2: If L1 dominates L2 and L2 dominates L3, L1 dominates L3
+Lemma 3: If L1 strictly dominates L2 and L2 strictly dominates L3, L1 strictly dominates L3
+Lemma 4: Strict dominance is acyclic
+Lemma 5: If L3 is reachable,L1 != L2, L1 strictly dominates L3, either L1 strictly dominates L2 OR L2 strictly dominates L1
+*)
 
 
 
 
-(*Well-formed MCFG*)
+
+
+(*********Well-formed SSA Programs**********)
 
 
 
 
-(*Given a PC that doesn't point to a terminator, the next instruction is always within the same *)
+(*Well-scoped instructions*)
+(*Every variable is only declared once*)
+(*All uses of a variable must be dominated by their definition*)
+(*The use of a variable at point p is well-scoped if it its definition strictly dominates its use*)
+
+
+
+
+(*Well-formed phi nodes*)
+(*
+Consider [ %x = phi [lbl1:v1, ...,lbln:vn] ].
+This is well formed when every predecessor block with terminator program point p' 
+has a label associated with value v.  Moreover, if v uses an id then the definition of the uid strictly dominates p'.
+*)
+
+
+
+(*
+Well Formed CFG:
+  -It has an start pt
+  -If all program points map to an instruction are well scopped 
+  -All phi nodes are well formed
+*)
+
+
+
+
+
+(*Well Formed CFGs*)
+(*A function is in valid SSA form if its CFG is well formed*)
+
+
+
+
+
+(*Well formed programs*)
+(*A Program is in valid SSA form if all of its functions are in valid SSA*)
+
+
+
+
+
+(**********Useful lemmas for SSA optimisations*********)
+
+
+
+
+(*Definition of a Dominator Tree*)
+(*Lemma dom_tree_exists: Given a well-formed SSA program there exists a dominator tree*)
+
