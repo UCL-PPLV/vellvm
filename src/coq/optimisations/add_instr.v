@@ -1,6 +1,7 @@
 
 Require Import ZArith.
 Require Import List.
+
 Require Import Bool.
 Require Import ZArith.Int.
 Require Import Vellvm.CFG.
@@ -19,7 +20,7 @@ Print raw_id.
   -Raw: used for code generation
 
 
-get_max function calculates the 
+get_max function calculates the first unused UIS
 *)
 
 
@@ -31,17 +32,66 @@ match c with
 end.
 
 
-(*Fetches the last generated instruction and adds 1 to it*)
-Definition get_first_unused (c:code) := IId (Raw (Z.add (get_maximum Z0 c) 1)).
+(*So that an instruction with a unique UID can be added, we need to find to find an unused value*)
+Print block.
+Print instr_id.
+Definition get_terminator_iid (b:block) : Z :=
+match b.(blk_term) with
+  | (IId (Raw n), _) => n
+  | (_, _) => Z0
+end.
+
+(*Find the largest instruction (which is either the terminator ID or an instruction from within the code) and adds 1 to it*)
+Definition get_first_unused (b:block) : instr_id := IId (Raw (Z.add (get_maximum (get_terminator_iid b) (b.(blk_code))) 1)).
 
 (*Useless instruction*)
 Definition no_instr : instr := INSTR_Op (SV (VALUE_Null)).
 
-(*Useless iid*)
-Definition useless_instr (c:code) : list (instr_id * instr) := cons (get_first_unused c, no_instr) nil.
 
-(*optimise *)
-Definition optimise (c:code) := c ++ useless_instr c.
+
+(*The code in a block gets executed sequentially.
+This optimisation adds an instruction to the end of that code therefore the impact this might have is on the block terminator instruction.
+There are currently 4 implemented terminator instructions:
+  | TERM_Ret :  tvalue -> terminator
+  | TERM_Ret_void : terminator
+  | TERM_Br :  tvalue -> block_id -> block_id ->  terminator
+  | TERM_Br_1 : block_id ->  terminator
+
+
+Explanation:
+TERM_Ret - return a typed value
+TERM_Ret_void - return void
+TERM_Br - branch to either block id depending on the evaluation of a typed value
+TERM_Br_1 - branch directly to block_id
+
+
+
+Let's add an instruction to a block if and only if its terminating instruction is TERM_Ret.
+*)
+
+
+
+(*Simple function that returns true if the terminating instruction is a return void*)
+Definition terminator_check (b:block) : bool :=
+match b.(blk_term) with
+  | (_, TERM_Ret_void) => true
+  | _ => false
+end.
+
+Print block.
+
+
+Definition add_instr_block (b:block) (i:(instr_id * instr)) := 
+mk_block b.(blk_id) b.(blk_phis) (b.(blk_code) ++ (cons i nil)) b.(blk_term).
+
+
+
+
+(*Useless iid*)
+Definition optimise (b:block) := if terminator_check b then (add_instr_block b (get_first_unused b, no_instr)) else b.
+
+Print block.
+
 
 
 Definition prog_optimise (p:modul CFG.cfg) := def_cfg_opt optimise p.

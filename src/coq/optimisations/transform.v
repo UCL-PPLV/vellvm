@@ -25,18 +25,15 @@ Definition list_block_opt (o:list block -> list block) (m:CFG.cfg) :=
 CFG.mkCFG m.(CFG.init) (o m.(CFG.blks)) m.(CFG.glbl).
 
 
-Definition block_opt (o:code -> code) (m: block) : block :=
-mk_block m.(blk_id) m.(blk_phis) m.(blk_code) m.(blk_term).
 
+Definition alter_blocks (o:block -> block) (m:CFG.cfg) : CFG.cfg :=
+CFG.mkCFG m.(CFG.init) (map o m.(CFG.blks)) m.(CFG.glbl).
 
-Definition alter_blocks (o:code -> code) (m:CFG.cfg) : CFG.cfg :=
-CFG.mkCFG m.(CFG.init) (map (block_opt o) m.(CFG.blks)) m.(CFG.glbl).
-
-Definition cfg_opt (o:code -> code) (m:definition CFG.cfg) :=
+Definition cfg_opt (o:block -> block) (m:definition CFG.cfg) :=
 mk_definition CFG.cfg m.(df_prototype) m.(df_args) (alter_blocks o m.(df_instrs)).
 
 
-Definition def_cfg_opt (o:code -> code) (m:modul CFG.cfg) := 
+Definition def_cfg_opt (o:block -> block) (m:modul CFG.cfg) := 
 mk_modul CFG.cfg m.(m_name) m.(m_target) m.(m_datalayout) m.(m_globals) m.(m_declarations) (map (cfg_opt o) m.(m_definitions)).
 
 

@@ -81,8 +81,11 @@ Well Formed CFG:
 (*A Program is in valid SSA form if all of its functions are in valid SSA*)
 
 
+(**********Lemmas deriving from SSA definitions*********)
 
 
+
+  (*  wf_cfg g -> pt_exists g p1 -> edge_pt g p1 p2 -> pt_exists g p2.*)
 
 (**********Useful lemmas for SSA optimisations*********)
 
@@ -91,4 +94,21 @@ Well Formed CFG:
 
 (*Definition of a Dominator Tree*)
 (*Lemma dom_tree_exists: Given a well-formed SSA program there exists a dominator tree*)
+
+
+
+
+
+
+(*EQUATIONAL LEMMA*)
+
+(*
+Because every assignment creates a new value name it cannot kill (i.e. invalidate)
+expressions previously computed from other values. In particular, if two expressions
+are textually the same, they are sure to evaluate the same result.
+*)
+
+
+
+
 

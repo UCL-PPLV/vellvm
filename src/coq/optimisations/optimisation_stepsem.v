@@ -181,28 +181,4 @@ intros. unfold stepD. unfold optimisedstepD. destruct s. destruct p.
 destruct (fetch CFG p); simpl; auto.
 Qed.
 
-
-Lemma step_sem_equiv : forall CFG s, trace_equiv (optimised_step_sem CFG s) (step_sem CFG s).
-Proof.
-pcofix CIH. intros. pfold.
-
-(*unfold left*)
-assert ((optimised_step_sem CFG s) = unroll_trace_state (optimised_step_sem CFG s)).
-destruct (optimised_step_sem CFG s); eauto.
-rewrite H. simpl. clear H.
-
-(*unfold right*)
-assert ((step_sem CFG s) = unroll_trace_state (step_sem CFG s)).
-destruct ((step_sem CFG s)); eauto. rewrite H; simpl.
-rewrite stepD_equiv.
-destruct (stepD CFG s).
-  +constructor. right. auto.
-  +constructor. right. auto.
-  +destruct m.
-    *constructor. constructor. auto.
-    *constructor. constructor.
-    *constructor. constructor. simpl.
-
-
-Admitted.
-
+(*No need for trace equiv proof*)

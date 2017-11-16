@@ -74,18 +74,30 @@ destruct (trace_map (fun _ : state => ()) <$> Fin v); eauto. rewrite H. simpl. c
 assert ((trace_map (fun _ : state => ()) <$> Err s) = unroll_event ((trace_map (fun _ : state => ()) <$> Err s))).
 destruct (trace_map (fun _ : state => ()) <$> Err s); eauto.
 rewrite H. simpl. auto. 
-    *destruct e. simpl in *. 
+(****)
+    *destruct e; simpl in *. 
       -constructor. right. apply CIH.
       -constructor. right. apply CIH.
       -constructor. right. apply CIH.
       -constructor. constructor.
-assert (((trace_map (fun _ : state => ()) <$>
-   effects_map (step_sem prog) (Call v args k))) = unroll_effects ((trace_map (fun _ : state => ()) <$>
-   effects_map (step_sem prog) (Call v args k)))).
-destruct ((trace_map (fun _ : state => ()) <$>
-   effects_map (step_sem prog) (Call v args k))); eauto. rewrite H. clear H. simpl in *.
+(*
+assert ((trace_map (fun _ : state => ()) <$>
+   Call v args (fun dv : value => step_sem prog (k dv))) = unroll_
+
+
+
+
+
+
+
+
+
+ rewrite H. clear H. simpl in *.
 constructor; auto. intros. subst. 
 
-(*How to finish CALL?*)
+
+
+right.
+(*How to finish?*)*)
 
 Admitted.

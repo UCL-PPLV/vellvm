@@ -14,7 +14,7 @@ MENHIR=menhir
 CP=cp
 
 COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp
-OPTIMISATIONFILES := pacoproofs transform wellformedSSA paco_util donothing add_instr add_instrproof optimisation_stepsem
+OPTIMISATIONFILES := transform wellformedSSA paco_util donothing add_instr add_instrproof optimisation_stepsem
 OLLVMFILES := 
 
 VFILES := $(COQFILES:%=coq/%.v) $(OPTIMISATIONFILES:%=coq/optimisations/%.v)
