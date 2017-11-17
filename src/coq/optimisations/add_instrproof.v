@@ -49,7 +49,7 @@ Print cmd.
 
 
 Inductive pc_match : mcfg -> pc -> (mcfg -> mcfg) -> pc -> Prop :=
-  | match_pc_intro : forall m p i f, fetch m p = Some i  ->  pc_match m p f p.
+  | match_pc_intro : forall m p i f, fetch m p = Some i  -> fetch (f m) p = Some i -> pc_match m p f p.
 
 Print state.
 Inductive state_match : mcfg -> (mcfg -> mcfg) -> state -> state -> Prop :=
@@ -60,7 +60,6 @@ Ltac try_finish X := simpl; try (simpl; constructor; constructor; auto); try ( c
 
 Print fetch.
 
-De
 
 
 Definition separate_fetch (o:mcfg -> mcfg) (m:mcfg) (p:pc) :=
@@ -72,30 +71,49 @@ end.
 
 
 
-(fetch (prog_optimise prog) p) = fetch prog p 
+
 Lemma add_instrproof : (forall st st1 prog, state_match prog prog_optimise st st1) -> forall st prog mem, trace_equiv (memD mem (sem (prog_optimise prog) st)) (memD mem (sem (prog) st)).
 Proof. intro. pcofix CIH.
 intros. pfold. generalize (H st st prog). intros. inversion H0. subst. inversion H1.
-subst. clear H6.
+subst. clear H7.
 
 
 
 (*unroll right*)
 assert ((memD mem (sem prog (p, e, s))) = unroll (memD mem (sem prog (p, e, s))) ).
 destruct (memD mem (sem prog (p, e, s))) ; eauto.
-rewrite H3. clear H3.
+rewrite H4. clear H4.
 
 (*unroll left*)
 assert ((memD mem (sem (prog_optimise prog) (p, e, s))) = unroll (memD mem (sem (prog_optimise prog) (p, e, s)))
-). destruct (memD mem (sem (prog_optimise prog) (p, e, s))); eauto. rewrite H3. clear H3.
+). destruct (memD mem (sem (prog_optimise prog) (p, e, s))); eauto. rewrite H4. clear H4.
 
 (*unroll*)
 simpl. 
 
+rewrite H2. rewrite H3.
+simpl.
+destruct i.
+  +simpl. 
 
-simpl in *.
 
+unfold incr_pc. simpl. destruct p. simpl. unfold prog_optimise.
+unfold optimise. unfold def_cfg_opt. simpl in *.
 
+ admit.
+  +simpl. destruct t.
+    *destruct v. simpl. destruct (eval_op e (Some t) v); simpl.
+      -constructor. constructor.
+      -destruct s. simpl. constructor. constructor. auto. simpl. destruct f. constructor. right. apply CIH. simpl. constructor. constructor.
+    *destruct s. simpl. constructor. constructor. auto. destruct f. simpl. constructor. constructor. constructor. right. apply CIH.
+    *destruct v. simpl. destruct (eval_op e (Some t) v). simpl. constructor. constructor. simpl. destruct v0. simpl. constructor. constructor. simpl. constructor. constructor. simpl. constructor. constructor. simpl.
+simpl. destruct (StepSemantics.Int1.eq x StepSemantics.Int1.one). admit. admit. simpl. constructor. constructor. simpl. constructor. constructor. simpl. constructor. constructor.
+    *admit.
+    *simpl. constructor. constructor.
+    *simpl. constructor. constructor.
+    *simpl. constructor. constructor.
+    *simpl. constructor. constructor.
+Admitted.
 (*
 
 rewrite H2. simpl.
@@ -173,7 +191,7 @@ unfold AstLib.ident_of_definition. simpl. admit.
 }
 }
 *)
-Admitted.
+
 
 
 

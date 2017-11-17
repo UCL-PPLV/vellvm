@@ -7,7 +7,10 @@ Require Import ZArith.Int.
 Require Import Vellvm.CFG.
 Require Import Vellvm.Ollvm_ast.
 Require Import Vellvm.optimisations.transform.
+Require Import ZArith List String Omega.
+Require Import Vellvm.AstLib Vellvm.Ollvm_ast.
 
+Import ListNotations.
 Print instr_id.
 Print raw_id.
 
@@ -81,10 +84,48 @@ end.
 Print block.
 Print block.
 Print fetch.
+Locate fetch.
+Print block_to_cmd.
+Print block.
 
+
+Definition fetch_two_block (b1: block) (c:code) (i:instr_id) : option (cmd * option instr_id) :=
+match block_to_cmd b1 i with
+  | None => match block_to_cmd (mk_block b1.(blk_id) b1.(blk_phis) c b1.(blk_term)) i with
+            | None => None
+            | Some t => Some t
+            end
+(*If terminator => test*)
+(*If new => test*)
+  | Some a => Some a
+end.
+
+
+
+
+(*
+Definition fetch (CFG : mcfg) (p:pc) : option cmd :=
+  let 'mk_pc fid bid iid := p in 
+  'cfg <- find_function CFG fid;
+  'blk <- find_block (blks (df_instrs cfg)) bid;
+  '(c, _) <- block_to_cmd blk iid;
+  mret c.*)
+
+
+(*
+
+We want something like
+  let 'mk_pc fid bid iid := p in 
+  'cfg <- find_function CFG fid;
+  'blk <- find_block (blks (df_instrs cfg)) bid;
+  '(c, _) <- dual_block_to_cmd blk i;
+  mret c.*)
+
+Print block.
+Print blk_code.
 
 Definition add_instr_block (b:block) (i:(instr_id * instr)) (b1:(instr_id * terminator)%type) := 
-mk_block b.(blk_id) b.(blk_phis) (b.(blk_code) ++ (cons i nil)) b1.
+mk_block b.(blk_id) b.(blk_phis) (blk_code b ++ (cons i nil)) b1.
 Print blk_term.
 
 Definition get_blk_id (b:block) : instr_id :=
@@ -100,10 +141,66 @@ match term with
 end.
 
 
-
-(*
-The added instruction has the instruction id of the terminator instruction
-Definition optimise (b:block) := if terminator_check b then (add_instr_block b (get_blk_id b, no_instr) (get_first_unused b,get_blk_term b)) else b.
-
+Print block_to_cmd.
+(*The added instruction has the instruction id of the terminator instruction*)
+Definition optimise (b:block) := if terminator_check b then (add_instr_block b (get_blk_id b, no_instr) (b.(blk_term))) else b.
 
 Definition prog_optimise (p:modul CFG.cfg) := def_cfg_opt optimise p.
+
+
+(*In the proof, there will always be the case:
+  fetch prog pc = ...
+  fetch (optimise prog) pc = ...
+
+As seen in the pacoproof.v, it is useful to write (fetch (optimise prog) pc) as a new function of fetch prog pc.
+This allows us to 
+
+
+
+
+
+(**************************************************************************)
+Definition dual_block_to_cmd (b:block) (i:instr_id) := if terminator_check b then fetch_two_block b (cons (get_blk_id b, no_instr) nil) i else block_to_cmd b i .
+
+
+Require Import Vellvm.Classes.
+Definition dual_fetch (CFG: mcfg) (p:pc) :=
+  let 'mk_pc fid bid iid := p in 
+  'cfg <- find_function CFG fid;
+  'blk <- find_block (blks (df_instrs cfg)) bid;
+  '(c, _) <- dual_block_to_cmd blk iid;
+  mret c.
+
+
+
+Lemma test1 : forall b i, dual_block_to_cmd b i = block_to_cmd (optimise b) i.
+Proof. intros. unfold dual_block_to_cmd. unfold optimise.
+unfold terminator_check. destruct b. simpl in *. destruct blk_term.
+destruct t; auto. 
+  +unfold fetch_two_block. simpl in *.
+unfold add_instr_block. simpl in *.
+remember ([(get_blk_id
+                        {|
+                        blk_id := blk_id;
+                        blk_phis := blk_phis;
+                        blk_code := blk_code;
+                        blk_term := (i0, TERM_Ret_void) |}, no_instr)]) as A.
+
+
+unfold block_to_cmd. simpl. unfold blk_term_id. simpl.
+simpl.
+induction (i0 == i). auto. subst. simpl. unfold get_blk_id. simpl.
+induction blk_code. simpl. unfold not in b. simpl in *.
+destruct (i == i0). symmetry in e. apply b in e. inversion e. auto.
+simpl. destruct a.
+destruct (i == i1). simpl.
+-unfold fallthrough. simpl. destruct blk_code. simpl. auto. simpl. auto.
+-auto.
+Qed.
+
+
+(******************SECOND*************************)
+
+
+incr pc as well....
+*)
