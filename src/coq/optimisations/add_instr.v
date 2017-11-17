@@ -79,19 +79,31 @@ match b.(blk_term) with
 end.
 
 Print block.
-
-
-Definition add_instr_block (b:block) (i:(instr_id * instr)) := 
-mk_block b.(blk_id) b.(blk_phis) (b.(blk_code) ++ (cons i nil)) b.(blk_term).
-
-
-
-
-(*Useless iid*)
-Definition optimise (b:block) := if terminator_check b then (add_instr_block b (get_first_unused b, no_instr)) else b.
-
 Print block.
+Print fetch.
 
+
+Definition add_instr_block (b:block) (i:(instr_id * instr)) (b1:(instr_id * terminator)%type) := 
+mk_block b.(blk_id) b.(blk_phis) (b.(blk_code) ++ (cons i nil)) b1.
+Print blk_term.
+
+Definition get_blk_id (b:block) : instr_id :=
+let term := b.(blk_term) in
+match term with 
+  | (term_id, term_instr) => term_id
+end.
+
+Definition get_blk_term (b:block)  :=
+let term := b.(blk_term) in
+match term with 
+  | (term_id, term_instr) => term_instr
+end.
+
+
+
+(*
+The added instruction has the instruction id of the terminator instruction
+Definition optimise (b:block) := if terminator_check b then (add_instr_block b (get_blk_id b, no_instr) (get_first_unused b,get_blk_term b)) else b.
 
 
 Definition prog_optimise (p:modul CFG.cfg) := def_cfg_opt optimise p.
