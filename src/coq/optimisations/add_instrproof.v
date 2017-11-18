@@ -38,16 +38,6 @@ Essentially, we want to solve this by induction on the terminator instruction of
 *)
 
 
-
-
-Print prog_optimise.
-Print optimise.
-Print fetch.
-Print stepD.
-Print incr_pc.
-Print cmd.
-
-
 Inductive pc_match : mcfg -> pc -> (mcfg -> mcfg) -> pc -> Prop :=
   | match_pc_intro : forall m p i f, fetch m p = Some i  -> fetch (f m) p = Some i -> pc_match m p f p.
 
@@ -70,7 +60,7 @@ end.
 
 
 
-
+(*
 
 Lemma add_instrproof : (forall st st1 prog, state_match prog prog_optimise st st1) -> forall st prog mem, trace_equiv (memD mem (sem (prog_optimise prog) st)) (memD mem (sem (prog) st)).
 Proof. intro. pcofix CIH.
@@ -94,7 +84,10 @@ simpl.
 rewrite H2. rewrite H3.
 simpl.
 destruct i.
-  +simpl. 
+  +
+unfold incr_pc. simpl. destruct p.
+
+(*induction on *)
 
 
 unfold incr_pc. simpl. destruct p. simpl. unfold prog_optimise.
@@ -194,6 +187,6 @@ unfold AstLib.ident_of_definition. simpl. admit.
 
 
 
-
+*)
 
 

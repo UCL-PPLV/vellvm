@@ -140,12 +140,12 @@ match term with
   | (term_id, term_instr) => term_instr
 end.
 
-
+(*V1*)
 Print block_to_cmd.
 (*The added instruction has the instruction id of the terminator instruction*)
-Definition optimise (b:block) := if terminator_check b then (add_instr_block b (get_blk_id b, no_instr) (b.(blk_term))) else b.
+Definition optimisev1 (b:block) := if terminator_check b then (add_instr_block b (get_blk_id b, no_instr) (b.(blk_term))) else b.
 
-Definition prog_optimise (p:modul CFG.cfg) := def_cfg_opt optimise p.
+Definition prog_optimisev1 (p:modul CFG.cfg) := def_cfg_opt optimisev1 p.
 
 
 (*In the proof, there will always be the case:
@@ -154,8 +154,8 @@ Definition prog_optimise (p:modul CFG.cfg) := def_cfg_opt optimise p.
 
 As seen in the pacoproof.v, it is useful to write (fetch (optimise prog) pc) as a new function of fetch prog pc.
 This allows us to 
-
-
+*)
+(*V2*)
 
 
 
@@ -173,8 +173,8 @@ Definition dual_fetch (CFG: mcfg) (p:pc) :=
 
 
 
-Lemma test1 : forall b i, dual_block_to_cmd b i = block_to_cmd (optimise b) i.
-Proof. intros. unfold dual_block_to_cmd. unfold optimise.
+Lemma test1 : forall b i, dual_block_to_cmd b i = block_to_cmd (optimisev1 b) i.
+Proof. intros. unfold dual_block_to_cmd. unfold optimisev1.
 unfold terminator_check. destruct b. simpl in *. destruct blk_term.
 destruct t; auto. 
   +unfold fetch_two_block. simpl in *.
@@ -199,8 +199,107 @@ destruct (i == i1). simpl.
 Qed.
 
 
+
+Print fetch.
+
+
+Definition fetch1 (CFG : mcfg) (p:pc) : option cmd :=
+  let 'mk_pc fid bid iid := p in 
+  'cfg <- find_function CFG fid;
+  'blk <- find_block (blks (df_instrs cfg)) bid;
+  '(c, _) <- dual_block_to_cmd blk iid;
+  mret c.
+
+
+
+
+
+Lemma equal_fetch : forall m p, fetch (prog_optimisev1 m) p = fetch1 m p.
+Proof. intros.
+destruct m. simpl.
+induction m_definitions.
+  +unfold prog_optimisev1 in *. unfold optimisev1. simpl. unfold def_cfg_opt. simpl. unfold fetch, fetch1. simpl. auto.
+  +simpl in *. unfold fetch, fetch1 in *. simpl. destruct p. simpl in *. destruct a. simpl in *.
+unfold find_function in *. simpl in *. unfold find_defn in *. simpl in *.
+unfold cfg_opt in *. simpl in *. auto. unfold ident_of in *. simpl in *. 
+unfold ident_of_definition in *. unfold ident_of in *. simpl in *.
+
+destruct (ident_of_declaration df_prototype == ID_Global fn).
+    *simpl in *. destruct df_instrs. simpl in *. induction blks; simpl in *; auto.
+      -destruct a. simpl. unfold optimisev1. simpl. unfold terminator_check. simpl.
+{destruct blk_term. simpl. destruct t; simpl; destruct (blk_id == bk); try (rewrite test1; unfold optimisev1; simpl; auto);
+try (induction blks; simpl; auto).
+}
+    *auto.
+Qed.
+
+
+
+Print find_block.
+
 (******************SECOND*************************)
 
 
-incr pc as well....
-*)
+
+Definition incr_pc1 (CFG : mcfg) (p:pc) : option pc :=
+  let 'mk_pc fid bid iid := p in 
+  'cfg <- find_function CFG fid;
+  'blk <- find_block (blks (df_instrs cfg)) bid;
+  '(c, n) <- dual_block_to_cmd blk iid;
+  'iid_next <- n;
+  mret (mk_pc fid bid iid_next).
+
+Lemma equal_incr_pc : forall m p, incr_pc (prog_optimisev1 m) p = incr_pc1 m p.
+Proof. intros. destruct m. simpl.
+destruct m_definitions; simpl in *.
+  +unfold prog_optimisev1 in *. unfold optimisev1. simpl. unfold def_cfg_opt. simpl. unfold incr_pc, incr_pc1. simpl. auto.
+  +simpl in *. unfold incr_pc, incr_pc1 in *. simpl. destruct p. simpl in *. destruct d. simpl in *.
+unfold find_function in *. simpl in *. unfold find_defn in *. simpl in *.
+unfold cfg_opt in *. simpl in *. auto. unfold ident_of in *. simpl in *. 
+unfold ident_of_definition in *. unfold ident_of in *. simpl in *.
+
+destruct (ident_of_declaration df_prototype == ID_Global fn).
+    *simpl in *. destruct df_instrs. simpl in *. induction blks.
+      -simpl in *. auto.
+      -destruct a. simpl. unfold optimisev1. simpl. unfold terminator_check. simpl.
+{destruct blk_term. simpl. destruct t; simpl; destruct (blk_id ==bk); try (rewrite test1; unfold optimisev1; simpl; eauto); try (induction blks; simpl; eauto).
+}
+    *induction m_definitions.
+      -simpl. auto.
+      -simpl.
+{destruct (ident_of_declaration (Ollvm_ast.df_prototype a) == ID_Global fn).
+        +simpl. destruct a. simpl in *. induction df_instrs0. 
+          -simpl in *. induction blks.
+            *simpl. auto.
+            *simpl. unfold optimisev1. unfold terminator_check. simpl. destruct a. simpl in *. destruct blk_term. clear IHm_definitions. simpl in *.
+{destruct t; simpl; destruct (blk_id == bk);
+try (simpl; unfold dual_block_to_cmd, block_to_cmd, blk_term_id; simpl; auto);
+try (induction blks; simpl; auto; auto).
+unfold fetch_two_block. simpl.
+unfold block_to_cmd; simpl in *.
+unfold blk_term_id; simpl in *.
+  *destruct (i == pt); auto. induction blk_code.
+    -simpl. unfold get_blk_id. simpl. induction (pt == i); auto.
+    -simpl. destruct a. destruct (pt == i0). simpl.
+unfold get_blk_id; simpl in *.
+unfold fallthrough. simpl. induction blk_code. simpl.
+auto.
+auto.
+auto.
+  *clear IHblks. clear IHblks0. 
+unfold fetch_two_block. simpl. unfold block_to_cmd. simpl.
+unfold get_blk_id. simpl. unfold blk_term_id. simpl.
+subst.
+destruct (i == pt); auto.
+induction blk_code; auto.
+  +simpl. destruct (pt == i); auto.
+  +simpl. destruct a0. destruct (pt == i0); auto. unfold fallthrough. 
+simpl. destruct blk_code; simpl; auto.
+}
+  +auto.
+}
+Qed.
+
+
+
+(**************************************************************************)
