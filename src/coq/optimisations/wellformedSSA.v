@@ -1,10 +1,61 @@
-Require Import ZArith List String Omega.
-Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util.
+Require Import Vellvm.Ollvm_ast Vellvm.CFG.
+Require Import Vellvm.optimisations.EqNat.
 
-Import ListNotations.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
+
+
+
+From mathcomp.ssreflect
+Require Import ssreflect ssrbool seq eqtype ssrnat.
+Print block.
+Print code.
+
+(*
+Well-formed block
+1. All instr_id in code (seq (instr_id * instr)) + blk_term should be unique
+*)
+
+
+
+Definition unique_instr_id (s:seq (instr_id * instr)) (b:(instr_id * terminator)) := uniq ((map fst s) ++ [::fst b]).
+
+
+Inductive well_form_block (b:block) :=
+ | wfb : unique_instr_id b.(blk_code) b.(blk_term) = true -> well_form_block b
+.
+
+
+(*A program is wellformed if all blocks within are well formed*)
+Print pc.
+Print find_function.
+
+(* A program is well formed, if given its mcfg and a pc:
+  -(function_find): There is always a function associated with its function_id
+  -(block_find): There is always a block associated with its block_id
+  -(some_block_to_cmd): There is always a command associated with its instruction_id
+  -(block_wf): If each block is wellformed
+*)
+
+
+Inductive well_formed_program (m:mcfg) (p:pc):=
+  | well_formed : forall i iid b bid cfg ins
+(block_wf: well_form_block b)
+(some_block_to_cmd: block_to_cmd b iid = Some ins)
+(block_find: find_block (blks (df_instrs cfg)) bid = Some b)
+(function_find: find_function m i = Some cfg), 
+p = mk_pc i bid iid ->
+well_formed_program m p.
+
+
+
+
+
+
+
+
+
 
 
 

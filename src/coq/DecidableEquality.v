@@ -1392,10 +1392,12 @@ Proof.
     { intros H; inversion H; apply cnd_v_neq; subst; auto. }
     { intros H; inversion H; apply cnd_t_neq; subst; auto. }
 Qed.
+Print eq_dec.
+Print Decidable.
 
 Instance eq_dec_instr : eq_dec instr.
 Proof.
-  lift_decide_eq; left; auto.
+  lift_decide_eq; left; auto. 
 Defined.
 
 Instance eq_dec_terminator : eq_dec terminator.

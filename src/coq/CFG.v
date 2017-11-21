@@ -103,6 +103,8 @@ Definition blk_term_pc (fid:function_id) (b:block) :=
 
 Fixpoint find_block bs block_id : option block :=
   find (fun b => if (blk_id b) == block_id then true else false) bs.
+Locate "==".
+Locate decide.
 
 Fixpoint find_instr (cd : code) (p:instr_id) (t:instr_id) : option (cmd * option instr_id) :=
   match cd with
@@ -120,7 +122,7 @@ Definition block_to_cmd (b:block) (iid:instr_id) : option (cmd * option instr_id
     Some (Term (snd (blk_term b)), None)
   else
     find_instr (blk_code b) iid term_id 
-.
+. Print pc.
                
 Definition fetch (CFG : mcfg) (p:pc) : option cmd :=
   let 'mk_pc fid bid iid := p in 

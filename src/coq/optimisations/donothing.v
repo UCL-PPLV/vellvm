@@ -50,7 +50,10 @@ Definition test1 prog v args k := unroll_effects ((trace_map (fun _ : state => (
 
 
 Lemma do_nothing_correct : forall mem st prog, trace_equiv (memD mem (sem prog st)) (memD mem (sem prog st)).
-Proof.
+Proof. Admitted.
+
+
+(*
 (*Initialise*)
 pcofix CIH.
 (*Normal proof.*)
@@ -60,44 +63,18 @@ intros. pfold.
 assert ((memD mem (sem prog st)) = unroll (memD mem (sem prog st))).
 destruct (memD mem (sem prog st)); eauto. rewrite H. simpl. clear H.
 
-(* let's destruct stepD*)
+unfold stepD. destruct st. destruct p. simpl.
+destruct prog. simpl. induction m_definitions.
+  +unfold CFG.fetch. simpl. destruct p. simpl. constructor. constructor.
+  +unfold CFG.fetch in *. simpl in *. destruct p. unfold CFG.find_function in *; simpl in *.
+unfold CFG.find_defn in *; simpl in *. destruct a. simpl in *.
+destruct df_instrs. induction blks.
+destruct (AstLib.ident_of
+                     {|
+                     df_prototype := df_prototype;
+                     df_args := df_args;
+                     df_instrs := {| CFG.init := init; CFG.blks := []; CFG.glbl := glbl |} |} ==
+                   ID_Global fn).
+simpl. constructor. constructor.
 
-destruct (stepD prog st).
-  +constructor. right. apply CIH.
-  +constructor. right. apply CIH.
-(*Destruct state event*)
-  +destruct m.
-    *simpl. constructor.
-assert ((trace_map (fun _ : state => ()) <$> Fin v) = unroll_event ((trace_map (fun _ : state => ()) <$> Fin v))).
-destruct (trace_map (fun _ : state => ()) <$> Fin v); eauto. rewrite H. simpl. constructor. auto.
-    *simpl. constructor.
-assert ((trace_map (fun _ : state => ()) <$> Err s) = unroll_event ((trace_map (fun _ : state => ()) <$> Err s))).
-destruct (trace_map (fun _ : state => ()) <$> Err s); eauto.
-rewrite H. simpl. auto. 
-(****)
-    *destruct e; simpl in *. 
-      -constructor. right. apply CIH.
-      -constructor. right. apply CIH.
-      -constructor. right. apply CIH.
-      -constructor. constructor.
-(*
-assert ((trace_map (fun _ : state => ()) <$>
-   Call v args (fun dv : value => step_sem prog (k dv))) = unroll_
-
-
-
-
-
-
-
-
-
- rewrite H. clear H. simpl in *.
-constructor; auto. intros. subst. 
-
-
-
-right.
-(*How to finish?*)*)
-
-Admitted.
+*)

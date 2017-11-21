@@ -8,7 +8,7 @@ Require Import paco.
 Require Import Vellvm.Memory.
 Require Import Vellvm.Effects.
 
-
+(*
 Print find_function.
 
 
@@ -37,9 +37,11 @@ Essentially, we want to solve this by induction on the terminator instruction of
 
 *)
 
+Print incr_pc.
+
 
 Inductive pc_match : mcfg -> pc -> (mcfg -> mcfg) -> pc -> Prop :=
-  | match_pc_intro : forall m p i f, fetch m p = Some i  -> fetch (f m) p = Some i -> pc_match m p f p.
+  | match_pc_intro : forall m p i j k l f, incr_pc m p = Some l -> incr_pc (f m) p = Some k -> fetch m p = Some i  -> fetch (f m) p = Some j -> pc_match m p f p.
 
 Print state.
 Inductive state_match : mcfg -> (mcfg -> mcfg) -> state -> state -> Prop :=
@@ -58,135 +60,40 @@ match fetch m p with
   | None => None
 end.
 
+Print prog_optimise.
+Print optimise.
+
+Print prog_optimise.
+Print def_cfg_opt.
+
+Definition nothing o : block := o.
 
 
+Definition prog_nothing := def_cfg_opt nothing.
+
+Lemma add_instrproof : (forall st st1 prog, state_match prog prog_optimise st st1) -> forall st prog mem, trace_equiv (memD mem (sem ((def_cfg_opt nothing) prog) st)) (memD mem (sem (prog) st)).
+Proof. intro. pcofix CIH. Admitted.
 (*
 
-Lemma add_instrproof : (forall st st1 prog, state_match prog prog_optimise st st1) -> forall st prog mem, trace_equiv (memD mem (sem (prog_optimise prog) st)) (memD mem (sem (prog) st)).
-Proof. intro. pcofix CIH.
-intros. pfold. generalize (H st st prog). intros. inversion H0. subst. inversion H1.
-subst. clear H7.
+intros. pfold. generalize (H st st prog). intros. 
+inversion H0. simpl. subst. inversion H1. simpl. subst.
 
+assert ((memD mem (sem (def_cfg_opt nothing prog) (p, e, s))) = unroll ((memD mem (sem (def_cfg_opt nothing prog) (p, e, s))))).
+destruct ((memD mem (sem (def_cfg_opt nothing prog) (p, e, s)))); eauto.
+rewrite H6.
 
+assert ((memD mem (sem prog (p, e, s))) = unroll (memD mem (sem prog (p, e, s)))
+). destruct (memD mem (sem prog (p, e, s))); eauto.
 
-(*unroll right*)
-assert ((memD mem (sem prog (p, e, s))) = unroll (memD mem (sem prog (p, e, s))) ).
-destruct (memD mem (sem prog (p, e, s))) ; eauto.
-rewrite H4. clear H4.
+rewrite H6. rewrite H7. clear H6; clear H7. simpl.
 
-(*unroll left*)
-assert ((memD mem (sem (prog_optimise prog) (p, e, s))) = unroll (memD mem (sem (prog_optimise prog) (p, e, s)))
-). destruct (memD mem (sem (prog_optimise prog) (p, e, s))); eauto. rewrite H4. clear H4.
-
-(*unroll*)
-simpl. 
-
-rewrite H2. rewrite H3.
-simpl.
-destruct i.
-  +
-unfold incr_pc. simpl. destruct p.
-
-(*induction on *)
-
-
-unfold incr_pc. simpl. destruct p. simpl. unfold prog_optimise.
-unfold optimise. unfold def_cfg_opt. simpl in *.
-
- admit.
-  +simpl. destruct t.
-    *destruct v. simpl. destruct (eval_op e (Some t) v); simpl.
-      -constructor. constructor.
-      -destruct s. simpl. constructor. constructor. auto. simpl. destruct f. constructor. right. apply CIH. simpl. constructor. constructor.
-    *destruct s. simpl. constructor. constructor. auto. destruct f. simpl. constructor. constructor. constructor. right. apply CIH.
-    *destruct v. simpl. destruct (eval_op e (Some t) v). simpl. constructor. constructor. simpl. destruct v0. simpl. constructor. constructor. simpl. constructor. constructor. simpl. constructor. constructor. simpl.
-simpl. destruct (StepSemantics.Int1.eq x StepSemantics.Int1.one). admit. admit. simpl. constructor. constructor. simpl. constructor. constructor. simpl. constructor. constructor.
-    *admit.
-    *simpl. constructor. constructor.
-    *simpl. constructor. constructor.
-    *simpl. constructor. constructor.
-    *simpl. constructor. constructor.
-Admitted.
-(*
-
-rewrite H2. simpl.
-unfold fetch in H3. simpl in *. destruct p. simpl in *.
-unfold find_function in H3. simpl in *.
-unfold cfg_opt in H3. simpl. unfold find_map in H3. simpl in *.
-
-
-
-
-
-
-
-
-
-
-
-
-destruct (fetch prog p); simpl in *; try_finish CIH.
-
-
-unfold fetch in H3. simpl in *. destruct p. simpl in *.
-unfold prog_optimise in H3. simpl in H3.
-unfold find_block in H3. simpl in H3.
-
-
-
-
-
-
-
-
-
-
-
-
-
-+destruct c; simpl.
-  -simpl. induction prog. simpl in *.
-simpl in *.
-
-unfold incr_pc.
-simpl in *. destruct p. simpl in *.
-
-
-
-unfold prog_optimise. simpl.
-unfold def_cfg_opt. simpl in *.
-unfold find_function. simpl in *.
-
-unfold prog_optimise in H3. simpl in H3.
-unfold def_cfg_opt in H3.
-simpl in *.
-unfold map, cfg_opt, optimise in H3; simpl in H3.
-unfold find_function in H3. simpl in *.
-unfold find_defn in H3. simpl in *.
-  -{destruct t; try_finish CIH.
-    *destruct v. destruct (eval_op e (Some t) v); try_finish CIH. destruct s; try_finish CIH. destruct f. constructor. right. apply CIH. try_finish CIH. 
-    *destruct s; try_finish CIH.
-      +destruct f.
-        -simpl. constructor. constructor.
-        -constructor. right. apply CIH.
-    *destruct v. destruct (eval_op e (Some t) v); simpl; try_finish CIH. destruct v0; simpl; try_finish CIH.
-destruct (StepSemantics.Int1.eq x StepSemantics.Int1.one). simpl.
-{
-unfold jump. unfold find_block_entry. simpl.
-destruct prog. simpl. unfold prog_optimise.
+destruct prog; simpl in *.
 unfold def_cfg_opt. simpl.
-destruct p. simpl.
-unfold cfg_opt. unfold alter_blocks.
-unfold find_function. simpl. unfold find_defn. simpl.
-unfold AstLib.ident_of. simpl.
-unfold AstLib.ident_of_definition. simpl. admit.
-
-}
-}
-*)
-
-
-
-*)
-
-
+induction m_definitions.
+  +unfold fetch in *; simpl in *. destruct p. inversion H4.
+  +unfold fetch in *. simpl in *. destruct p. simpl in *.
+unfold find_function in *. simpl in *.
+unfold find_defn in *.
+unfold cfg_opt in *; simpl in *.
+unfold AstLib.ident_of in *; simpl in *.
+*)*)
