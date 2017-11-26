@@ -27,6 +27,8 @@ Inductive well_form_block (b:block) :=
 .
 
 
+
+Print definition.
 (*A program is wellformed if all blocks within are well formed*)
 Print pc.
 Print find_function.
@@ -37,16 +39,32 @@ Print find_function.
   -(some_block_to_cmd): There is always a command associated with its instruction_id
   -(block_wf): If each block is wellformed
 *)
+Print pc.
+Print incr_pc.
+Print fetch.
 
-
-Inductive well_formed_program (m:mcfg) (p:pc):=
-  | well_formed : forall i iid b bid cfg ins
+Inductive well_formed_program (m:mcfg) (o:mcfg->mcfg) (fn:function_id) (bk:block_id) (pt:instr_id) :=
+  | well_formed : forall b b1 cfg cfg1 ins ins1 instr instr1 pc pc1
 (block_wf: well_form_block b)
-(some_block_to_cmd: block_to_cmd b iid = Some ins)
-(block_find: find_block (blks (df_instrs cfg)) bid = Some b)
-(function_find: find_function m i = Some cfg), 
-p = mk_pc i bid iid ->
-well_formed_program m p.
+(block_wf: well_form_block b1)
+
+(some_block_to_cmd: block_to_cmd b pt = Some ins)
+(some_block_to_cmd: block_to_cmd b1 pt = Some ins1)
+(some_fetch: fetch (o m) (mk_pc fn bk pt) = Some instr1)
+(some_fetch: fetch (m) (mk_pc fn bk pt) = Some instr)
+(some_pc: incr_pc (o m) (mk_pc fn bk pt) = Some pc)
+(some_pc: incr_pc (m) (mk_pc fn bk pt) = Some pc1)
+(block_find: find_block (blks (df_instrs cfg)) bk = Some b)
+(block_find: find_block (blks (df_instrs cfg1)) bk = Some b1)
+
+(function_find: find_function m fn = Some cfg)
+(function_optimised_find: find_function (o m) fn = Some cfg1), 
+
+
+
+
+well_formed_program m o fn bk pt.
+
 
 
 
