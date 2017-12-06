@@ -585,42 +585,78 @@ Admitted.
 (*Jump equiv*)
 
 
-
-Print jump.
-Locate jump.
-Print find_block.
-
-Definition jump_test1 a function_id end_bid:=
-      match find_block (blks (df_instrs a)) end_bid with
-      | Some a0 => Some (block_to_entry function_id a0)
-      | None => None
-      end
-.
-Print jump_test1.
-
-Print find_block.
+(* Definition find_function_entry (CFG:mcfg) (fid:function_id) : option function_entry :=
+  'dfn <- find_function CFG fid;
+  let cfg := df_instrs dfn in
+  'blk <- find_block (blks cfg) (init cfg);
+  mret (FunctionEntry (df_args dfn) (mk_pc fid (init cfg) (blk_entry_id blk))).  
+*)
 
 
-Definition jump_test2 a function_id end_bid :=
-      match find_block (blks (df_instrs a)) end_bid with
-      | Some a0 => Some (block_to_entry function_id (optimise_block a0))
-      | None => None
-      end.
-Print jump_test1.
+Print FunctionEntry.
+Print blk_entry_id.
+Print pc.
+
+Definition find_function_condition_part blk p s := if decide ((blk_term_id blk) = p.(pt)) then 
+Some (FunctionEntry s (mk_pc p.(fn) p.(bk) (get_first_unused blk))) else Some (FunctionEntry s p).
 
 
-Lemma jump_test_eq : forall mcfg function_id end_bid, jump_test1 (cfg_opt optimise_block mcfg) function_id end_bid = jump_test2 mcfg function_id end_bid.
-Proof. intros. unfold jump_test1, jump_test2. simpl. destruct mcfg. simpl. destruct df_instrs. simpl.
-induction blks. simpl. auto.
-simpl. unfold optimise_block. simpl. unfold blk_id. simpl. destruct a. simpl.
+Definition find_function_condition (CFG:mcfg) (p:pc) (fid:function_id) (s:seq local_id) : option function_entry :=
+let dfn := find_function CFG fid in
+match dfn with
+  | Some fn_bod => let cfg := df_instrs fn_bod in
+                   match (find_block (blks cfg) (init cfg)) with
+                   | None => None
+                   | Some blk => if (term_check blk) then find_function_condition_part blk p s else (Some (FunctionEntry s p))
+                   end
+  | None => None
+end.
 
-unfold term_check. simpl. destruct blk_term. simpl. destruct t.
-destruct (decide (blk_id = end_bid)). simpl. auto. admit.
-simpl. destruct (decide (blk_id = end_bid)). simpl. auto. admit.
-destruct (decide (blk_id = end_bid)). simpl. auto. admit.
-destruct (decide (blk_id = end_bid)). simpl. auto. admit.
-destruct (decide (blk_id = end_bid)). simpl. auto. admit.
-destruct (decide (blk_id = end_bid)). simpl. auto. admit.
-destruct (decide (blk_id = end_bid)). simpl. auto. admit.
-destruct (decide (blk_id = end_bid)). simpl. auto. admit.
-Admitted.
+
+
+Definition find_function_entry_double (CFG:mcfg) (fid:function_id) : option function_entry :=
+match (find_function_entry CFG fid) with
+  | None => None
+  | Some (FunctionEntry a pc) => find_function_condition CFG pc fid a
+end.
+
+
+Print optimise_block.
+
+ Definition find_function_entry_change (CFG:mcfg) (fid:function_id) : option function_entry :=
+  'dfn <- find_function CFG fid;
+  let cfg := df_instrs dfn in
+  'blk <- find_block (blks cfg) (init cfg);
+  mret (FunctionEntry (df_args dfn) (mk_pc fid (init cfg) (blk_entry_id (optimise_block blk)))).
+
+
+
+Lemma find_equiv : forall CFG fid, find_function_entry_change CFG fid = find_function_entry (optimise_program CFG) fid.
+Proof. intros. unfold find_function_entry_change, find_function_entry.
+simpl. unfold find_function. destruct CFG. simpl. induction m_definitions. simpl. auto.
+simpl. unfold find_defn.
+unfold ident_of.
+simpl.
+unfold ident_of_definition. simpl.
+destruct (decide (ident_of (df_prototype a) = ID_Global fid)).
+  +simpl. destruct a. simpl. induction df_instrs. simpl.
+induction blks. simpl. auto. simpl.
+destruct a. simpl. unfold optimise_block. simpl. unfold term_check.
+simpl. destruct blk_term. simpl. induction t.
+    *simpl. destruct (decide (blk_id = init)). simpl. auto. simpl.
+  auto. induction blks. simpl. auto.
+simpl.
+
+
+
+
+
+
+
+
+ Admitted.
+
+
+
+
+

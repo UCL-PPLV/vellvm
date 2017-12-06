@@ -63,6 +63,23 @@ Fixpoint MemDFin (m:memory) (d:Trace ()) (steps:nat) : option memory :=
   end%N.
 
 
+Fixpoint MemDFin1 (m:memory) (d:Trace ()) (steps:nat) : option memory :=
+  match steps with
+  | O => Some m
+  | S x =>
+    match d with
+    | Vis (Fin d) => Some m
+    | Vis (Err s) => None
+    | Tau _ d' => MemDFin1 m d' x
+    | Vis (Eff e)  =>
+      match mem_step e m with
+      | inr (m', v, k) => MemDFin1 m' (k v) x
+      | inl _ => None
+      end
+    end
+  end%N.
+
+
 (*
 Previous bug: 
 Fixpoint MemDFin {A} (memory:mtype) (d:Obs A) (steps:nat) : option mtype :=

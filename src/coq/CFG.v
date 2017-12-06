@@ -161,6 +161,12 @@ Definition find_function_entry (CFG:mcfg) (fid:function_id) : option function_en
   mret (FunctionEntry (df_args dfn) (mk_pc fid (init cfg) (blk_entry_id blk))).  
 
 
+Print df_args.
+Print init.
+Print cfg.
+Print blk_entry_id.
+Print fallthrough.
+
 (*
 Definition code_of_definition (d:definition (list block)) (p:pt) : option cmd :=
   cmd_from_blocks p (df_instrs d).

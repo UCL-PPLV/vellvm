@@ -13,7 +13,7 @@ Require Import ssreflect ssrbool seq eqtype ssrnat.
 Print find_function.
 
 
-
+(*
 (*Let's prove the find_function does not get impacted by both*)
 
 
@@ -67,7 +67,6 @@ repeat match goal with
   | [ |- related_event_step (upaco2 (trace_equiv_step (X:=())) _) (Vis (trace_map (fun _ : state => ()) <$> Err _)) (Vis (trace_map (fun _ : state => ()) <$> Err _)) ] => constructor
   | [ |- trace_equiv_step (upaco2 (trace_equiv_step (X:=())) _) (Vis (trace_map (fun _ : state => ()) <$> Fin _)) (Vis (trace_map (fun _ : state => ()) <$> Fin _)) ] => constructor; constructor; auto
   | [ |- trace_equiv_step (upaco2 (trace_equiv_step (X:=())) _) (Tau () (memD _ (trace_map (fun _ : state => ()) (step_sem _ _)))) (Tau () (memD _ (trace_map (fun _ : state => ()) (step_sem _ _))))] => constructor; right; apply X
-
 end.
 
 Ltac destr_simpl P X:= destruct P; simpl in *; finish X.
@@ -76,35 +75,60 @@ Print terminator.
 
 Print pc.
 
+Print fetch.
+
+
+
+Lemma trace_equiv_refl : forall (a:Trace ()), trace_equiv a a.
+Proof. pcofix CIH.
 
 
 
 
-Lemma add_instrproof : (forall m fn bk pt, well_formed_program m optimise_program fn bk pt) -> (forall (t:terminator), t = TERM_Ret_void) -> forall st prog mem, trace_equiv (memD mem (sem (optimise_program prog) st)) (memD mem (sem (prog) st)).
-Proof. intros PROGRAM CHECK. pcofix CIH. intros. pfold.
+
+Proof.
+  pcofix CIH. intro d.
+  pfold. destruct d; eauto.
+  - destruct v; eauto. destruct e; econstructor; eauto; constructor; apply related_effect_refl;
+    apply upaco2_refl; auto.
+Qed.
+
+
+Lemma add_instrproof : (forall m p s, incr_pc m p = Some s) -> (forall m p s, fetch m p = Some s) -> (forall m fn bk pt, well_formed_program m optimise_program fn bk pt) -> (forall (t:terminator), t = TERM_Ret_void) -> forall st prog mem, trace_equiv (memD mem (sem (optimise_program prog) st)) (memD mem (sem (prog) st)).
+Proof. intros INCRPC FETCH PROGRAM CHECK. pcofix CIH. intros. pfold.
 destruct st.
 destruct p.
-
-
-
-
-
 assert (memD mem (sem prog (p, e, s)) = unroll (memD mem (sem prog (p, e, s)))).
 destruct (memD mem (sem prog (p, e, s))); simpl; auto. rewrite H. clear H.
-
 assert ((memD mem (sem (optimise_program prog) (p, e, s))) = unroll ((memD mem (sem (optimise_program prog) (p, e, s))))).
 destruct ((memD mem (sem (optimise_program prog) (p, e, s)))); simpl; auto. rewrite H. clear H.
-
 simpl.
+
+
+generalize (FETCH (optimise_program prog) p); intros fetch_opt.
+generalize (FETCH (prog) p); intros fetch.
+
+
+generalize (INCRPC (optimise_program prog) p); intros incr_opt.
+generalize (INCRPC (prog) p); intros incr.
+
+
+
+
 
 
 rewrite double_fetch_eq.
 rewrite double_incr_pc_eq.
 
+rewrite double_fetch_eq in fetch_opt.
+rewrite double_incr_pc_eq in incr_opt.
+
+
+
 destruct p.
-unfold double_fetch. simpl. unfold double_block_to_cmd_check. unfold double_block_to_cmd.
-simpl. unfold find_instr_double. simpl.
-unfold block_to_cmd.
+unfold double_fetch in *. simpl in *. unfold double_block_to_cmd_check in *. unfold double_block_to_cmd in *.
+simpl in *. unfold find_instr_double in *. simpl in *.
+unfold block_to_cmd in *.
 
 
 
@@ -117,15 +141,628 @@ destr_simpl df_instrs CIH. simpl in *.
 remember (find_block blks bk) as B.
 destr_simpl B CIH.
 
-unfold term_check.
+unfold term_check in *.
 destr_simpl b CIH. simpl in *.
 destr_simpl blk_term CIH.
 
 
 generalize (CHECK t). intros.
-unfold blk_term_id. simpl.
+unfold blk_term_id in *. simpl in *.
 destr_simpl t CIH; try inversion H.
+unfold is_left in *. simpl in *.
+destr_simpl (decide (i = pt)) CIH; subst.
+
+specialize (incr_opt (mk_pc fn bk pt)). inversion incr_opt.
+remember (find_instr blk_code pt i) as C.
+destr_simpl C CIH.
+destr_simpl p CIH.
+destr_simpl c CIH.
+destr_simpl o CIH.
+destr_simpl (decide (i1 = i)) CIH; subst.
+destr_simpl pt CIH.
+destr_simpl i0 CIH.
+
+
+destr_simpl (eval_op e None op) CIH.
+
+
+(*FIRST SIMULATION*)
+
+constructor. left. pfold.
+
+
+
+assert ((memD mem
+     (trace_map (fun _ : state => ())
+        (step_sem prog ({| fn := fn; bk := bk; pt := i |}, add_env id v e, s)))) = unroll (memD mem
+     (trace_map (fun _ : state => ())
+        (step_sem prog ({| fn := fn; bk := bk; pt := i |}, add_env id v e, s))))).
+destruct (memD mem
+     (trace_map (fun _ : state => ())
+        (step_sem prog ({| fn := fn; bk := bk; pt := i |}, add_env id v e, s)))); auto.
+rewrite H0; clear H0.
+
+
+
+
+
+
+simpl. rewrite <- HeqA. simpl.
+rewrite <- HeqB. simpl.
+unfold block_to_cmd. unfold blk_term_id. simpl.
+destr_simpl (decide (i = i)) CIH.
+
+
+remember ({|
+            fn := fn;
+            bk := bk;
+            pt := get_first_unused
+                    {|
+                    blk_id := blk_id;
+                    blk_phis := blk_phis;
+                    blk_code := blk_code;
+                    blk_term := (i, TERM_Ret_void) |} |}, add_env id v e, s) as NEWSTATE.
+
+assert (  (memD mem
+     (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE))) = unroll   (memD mem
+     (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE)))).
+destruct   (memD mem
+     (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE))); auto.
+rewrite H0. clear H0.
+simpl. unfold stepD. subst.
+
+
+
+rewrite double_fetch_eq.
+rewrite double_incr_pc_eq.
+
+unfold double_fetch.
+unfold double_incr_pc.
+unfold double_block_to_cmd_check. simpl.
+
+simpl. rewrite <- HeqA. simpl.
+rewrite <- HeqB. simpl.
+unfold double_block_to_cmd. unfold blk_term_id. unfold blk_term.
+simpl in *.
 unfold is_left. simpl in *.
+destruct (decide
+                    (i =
+                     get_first_unused
+                       {|
+                       blk_id := blk_id;
+                       blk_phis := blk_phis;
+                       blk_code := blk_code;
+                       blk_term := (i, TERM_Ret_void) |})). 
+
+(*E1 IS WRONG*) admit.
+unfold find_instr_double. simpl.
+destr_simpl (find_instr blk_code
+                   (get_first_unused
+                      {|
+                      blk_id := blk_id;
+                      blk_phis := blk_phis;
+                      blk_code := blk_code;
+                      blk_term := (i, TERM_Ret_void) |}) i) CIH.
+(*second is also wrong*) admit.
+
+destruct (decide
+                   (get_first_unused
+                      {|
+                      blk_id := blk_id;
+                      blk_phis := blk_phis;
+                      blk_code := blk_code;
+                      blk_term := (i, TERM_Ret_void) |} =
+                    get_first_unused
+                      {|
+                      blk_id := blk_id;
+                      blk_phis := blk_phis;
+                      blk_code := blk_code;
+                      blk_term := (i, TERM_Ret_void) |})). simpl.
+constructor.
+
+remember (({| fn := fn; bk := bk; pt := i |},
+           add_env
+             (Raw
+                (get_maximum
+                   (get_terminator_iid
+                      {|
+                      blk_id := blk_id;
+                      blk_phis := blk_phis;
+                      blk_code := blk_code;
+                      blk_term := (i, TERM_Ret_void) |}) blk_code + 1)%Z)
+             (DV VALUE_Null) (add_env id v e), s)) as NEWSTATE.
+
+assert (  (memD mem
+     (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE))) = unroll
+  (memD mem
+     (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE)))).
+destruct   (memD mem
+     (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE))); auto. rewrite H0. clear H0.
+simpl. unfold stepD. destruct NEWSTATE. destruct p. 
+
+rewrite double_fetch_eq.
+rewrite double_incr_pc_eq.
+unfold double_fetch.
+simpl.
+destruct p. inversion HeqNEWSTATE. subst. 
+rewrite <- HeqA. simpl. rewrite <- HeqB. simpl.
+unfold double_block_to_cmd_check.
+unfold double_block_to_cmd. unfold blk_term_id. unfold blk_term.
+simpl. unfold is_left.
+
+destr_simpl (decide (i = i)) CIH.
+destr_simpl s CIH.
+destr_simpl f CIH.
+assert (i = i) by auto. unfold not in n1. apply n1 in H0. inversion H0.
+
+assert (get_first_unused
+       {|
+       blk_id := blk_id;
+       blk_phis := blk_phis;
+       blk_code := blk_code;
+       blk_term := (i, TERM_Ret_void) |} = get_first_unused
+       {|
+       blk_id := blk_id;
+       blk_phis := blk_phis;
+       blk_code := blk_code;
+       blk_term := (i, TERM_Ret_void) |}) by auto.
+unfold not in n1. apply n1 in H0. inversion H0.
+assert (i = i) by auto. unfold not in n0. apply n0 in H0.
+inversion H0.
+
+
+(*END*)
+
+
+
+
+
+
+
+
+destr_simpl fn0 CIH.
+destr_simpl i0 CIH.
+(*********find_function equiv*)
+
+rewrite find_function_equiv. unfold find_function_entry_double.
+unfold find_function_entry. simpl.
+
+remember (find_function prog id0) as D. destr_simpl D CIH.
+simpl. destr_simpl d CIH. destr_simpl df_instrs CIH.
+
+remember (find_block blks0 init0) as E. destr_simpl E CIH.
+simpl. unfold find_function_condition. simpl.
+rewrite <- HeqD. simpl. rewrite <- HeqE. simpl.
+unfold term_check. destr_simpl b CIH.
+destr_simpl blk_term CIH. 
+
+
+generalize (CHECK t0); intro check. induction t0; try inversion check; simpl.
+unfold find_function_condition_part. unfold blk_term_id.
+simpl. unfold blk_entry_id. unfold fallthrough.
+unfold is_left. simpl. destruct blk_code0.
+unfold blk_term_id. unfold blk_term. simpl.
+
+destruct (decide (i0 = i0) ).
+ simpl.
+
+destr_simpl (           map_monad
+             (fun '(t0, op) => eval_op e (Some t0) op) args) CIH. admit.
+
+
+(*not equal*) admit.
+destruct p. simpl.
+destruct (decide (i0 = i1)). subst.
+simpl.
+
+destr_simpl (map_monad
+             (fun '(t0, op) => eval_op e (Some t0) op) args) CIH. admit.
+
+simpl.
+
+destr_simpl ( map_monad
+             (fun '(t0, op) => eval_op e (Some t0) op) args) CIH. admit.
+admit.
+
+
+
+
+
+
+
+
+destr_simpl ptr CIH.
+
+destr_simpl (eval_op e (Some t0) v) CIH.
+destr_simpl v0 CIH.
+
+(*THIRD SIMULATION*)
+
+
+constructor. left.
+
+
+assert ( (memD mem
+     (trace_map (fun _ : state => ())
+        (step_sem prog
+           ({| fn := fn; bk := bk; pt := i |},
+           add_env id (List.nth_default undef mem a) e, s)))) = unroll
+ (memD mem
+     (trace_map (fun _ : state => ())
+        (step_sem prog
+           ({| fn := fn; bk := bk; pt := i |},
+           add_env id (List.nth_default undef mem a) e, s))))).
+destruct  (memD mem
+     (trace_map (fun _ : state => ())
+        (step_sem prog
+           ({| fn := fn; bk := bk; pt := i |},
+           add_env id (List.nth_default undef mem a) e, s)))); auto.
+rewrite H0; clear H0.
+
+
+
+
+simpl. rewrite <- HeqA. simpl.
+rewrite <- HeqB. simpl. unfold block_to_cmd.
+unfold blk_term_id.
+unfold blk_term. simpl.
+
+
+
+
+
+remember ({|
+            fn := fn;
+            bk := bk;
+            pt := get_first_unused
+                    {|
+                    blk_id := blk_id;
+                    blk_phis := blk_phis;
+                    blk_code := blk_code;
+                    blk_term := (i, TERM_Ret_void) |} |},
+           add_env id (List.nth_default undef mem a) e, s) as NEWSTATE.
+
+assert (  (memD mem (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE))) = unroll   (memD mem (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE)))).
+destruct   (memD mem (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE))); auto.
+rewrite H0; clear H0.
+simpl. unfold stepD. destruct NEWSTATE. destruct p. simpl.
+rewrite double_fetch_eq.
+rewrite double_incr_pc_eq. inversion HeqNEWSTATE. subst.
+
+unfold double_fetch. simpl. rewrite <- HeqA. simpl.
+rewrite <- HeqB. simpl. unfold double_block_to_cmd_check.
+unfold term_check. simpl. unfold double_block_to_cmd.
+unfold blk_term_id. simpl. 
+
+destruct ((decide
+                      (i =
+                       get_first_unused
+                         {|
+                         blk_id := blk_id;
+                         blk_phis := blk_phis;
+                         blk_code := blk_code;
+                         blk_term := (i, TERM_Ret_void) |}))).
+admit.
+
+simpl. unfold find_instr_double. simpl.
+
+
+
+destruct (find_instr blk_code
+                   (get_first_unused
+                      {|
+                      blk_id := blk_id;
+                      blk_phis := blk_phis;
+                      blk_code := blk_code;
+                      blk_term := (i, TERM_Ret_void) |}) i).
+admit. simpl.
+
+
+
+destruct (decide
+                   (get_first_unused
+                      {|
+                      blk_id := blk_id;
+                      blk_phis := blk_phis;
+                      blk_code := blk_code;
+                      blk_term := (i, TERM_Ret_void) |} =
+                    get_first_unused
+                      {|
+                      blk_id := blk_id;
+                      blk_phis := blk_phis;
+                      blk_code := blk_code;
+                      blk_term := (i, TERM_Ret_void) |})).
+simpl. pfold.
+constructor.
+
+remember ({| fn := fn; bk := bk; pt := i |},
+           add_env
+             (Raw
+                (get_maximum
+                   (get_terminator_iid
+                      {|
+                      blk_id := blk_id;
+                      blk_phis := blk_phis;
+                      blk_code := blk_code;
+                      blk_term := (i, TERM_Ret_void) |}) blk_code + 1)%Z) 
+             (DV VALUE_Null) (add_env id (List.nth_default undef mem a) e), s) as NEWSTATE.
+
+assert ((memD mem (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE))) = unroll (memD mem (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE)))).
+destruct (memD mem (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE))); auto.
+rewrite H0; clear H0. simpl. subst. unfold stepD.
+rewrite double_fetch_eq.
+rewrite double_incr_pc_eq. inversion HeqNEWSTATE. subst.
+unfold double_fetch. simpl. rewrite <- HeqA. simpl.
+rewrite <- HeqB. simpl.
+unfold double_block_to_cmd_check.
+unfold term_check. unfold blk_term. simpl.
+unfold double_block_to_cmd. unfold blk_term_id.
+simpl. unfold is_left.
+destruct (decide (i = i)). simpl. destr_simpl s CIH.
+destr_simpl f CIH. 
+
+assert (i = i) by auto. unfold not in n1. apply n1 in H0.
+inversion H0.
+
+assert (get_first_unused
+       {|
+       blk_id := blk_id;
+       blk_phis := blk_phis;
+       blk_code := blk_code;
+       blk_term := (i, TERM_Ret_void) |} = get_first_unused
+       {|
+       blk_id := blk_id;
+       blk_phis := blk_phis;
+       blk_code := blk_code;
+       blk_term := (i, TERM_Ret_void) |}) by auto.
+unfold not in n1. apply n1 in H0. inversion H0.
+
+
+
+(*END*)
+
+
+destr_simpl i0 CIH.
+destr_simpl fn0 CIH.
+destr_simpl i0 cIH.
+
+
+admit.
+
+
+(*JUMP*) (*
+rewrite find_function_equiv.
+unfold find_function_entry_double.
+
+unfold find_function_entry.
+simpl.
+
+remember (find_function prog id) as D.
+destr_simpl D CIH. destr_simpl d CIH.
+destr_simpl df_instrs CIH. 
+remember (find_block blks0 init0) as E.
+destr_simpl E CIH.
+unfold find_function_condition.
+simpl. rewrite <- HeqD. simpl.
+rewrite <- HeqE. simpl.
+destr_simpl b CIH. 
+destr_simpl blk_term CIH.
+unfold term_check. simpl.
+
+generalize (CHECK t0). intros check_term.
+destr_simpl t0 CIH; try inversion check_term; simpl.
+unfold find_function_condition_part. simpl.
+unfold blk_term_id. unfold blk_entry_id.
+simpl.
+
+unfold is_left. simpl. unfold blk_term_id.
+unfold fallthrough. unfold blk_term. simpl.
+
+destr_simpl blk_code0 CIH.
+destr_simpl (decide (i0 = i0)) CIH.
+destr_simpl (map_monad (fun '(t0, op) => eval_op e (Some t0) op) args) CIH.
+destr_simpl t CIH.
+
+
+
+
+(*FOURTH SIMULATION*)
+
+
+admit.
+
+
+(*END*)
+
+
+
+assert (i0 = i0) by auto.
+apply n1 in H0. inversion H0.
+destr_simpl p CIH.
+destr_simpl (decide (i0 = i1)) CIH. subst.
+
+
+destr_simpl (map_monad (fun '(t0, op) => eval_op e (Some t0) op) args) CIH.
+destr_simpl t CIH.
+
+(*SIMULATION*) admit.
+destr_simpl (map_monad (fun '(t0, op) => eval_op e (Some t0) op) args) CIH.
+destr_simpl t CIH. constructor.
+
+left. pfold.
+
+remember ({| fn := id; bk := init0; pt := i1 |}, combine df_args0 l,
+           KRet_void e {| fn := fn; bk := bk; pt := i |} :: s) as NEWSTATE.
+
+
+
+
+assert ((memD mem (trace_map (fun _ : state => ()) (step_sem prog NEWSTATE)))
+= unroll (memD mem (trace_map (fun _ : state => ()) (step_sem prog NEWSTATE)))).
+destruct (memD mem (trace_map (fun _ : state => ()) (step_sem prog NEWSTATE))); auto.
+rewrite H0. clear H0.
+simpl. unfold stepD. subst.
+unfold CFG.fetch. simpl.
+rewrite <- HeqD. simpl.
+rewrite <- HeqE. simpl.
+unfold block_to_cmd.
+unfold blk_term_id. simpl.
+
+destruct (decide (i0 = i1)).
+apply n1 in e0. inversion e0.
+destruct (decide (i1 = i1)).
+simpl.
+
+
+remember (({| fn := id; bk := init0; pt := i1 |}, combine df_args0 l,
+           KRet_void e
+             {|
+             fn := fn;
+             bk := bk;
+             pt := get_first_unused
+                     {|
+                     blk_id := blk_id;
+                     blk_phis := blk_phis;
+                     blk_code := blk_code;
+                     blk_term := (i, TERM_Ret_void) |} |} :: s)) as NEWSTATE.
+
+assert (  (memD mem (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE)))
+= unroll   (memD mem (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE)))).
+destruct   (memD mem (trace_map (fun _ : state => ()) (step_sem (optimise_program prog) NEWSTATE))); auto. rewrite H0; clear H0.
+simpl. unfold stepD.
+subst.
+
+rewrite double_fetch_eq.
+rewrite double_incr_pc_eq.
+unfold double_fetch.
+simpl.
+rewrite <- HeqD. simpl.
+rewrite <- HeqE. simpl.
+unfold double_block_to_cmd_check.
+unfold term_check. simpl.
+unfold double_block_to_cmd.
+unfold blk_term_id. simpl.
+unfold is_left.
+destr_simpl (decide (i0 = i1)) CIH.
+apply n2 in e1. inversion e1.
+unfold find_instr_double. simpl.
+destruct (decide (i1 = i1)). 
+unfold is_left.
+unfold fallthrough.
+*)
+
+(*END JUMP*)
+
+destr_simpl val CIH; destr_simpl ptr CIH.
+destr_simpl (eval_op e (Some t) v) CIH; destr_simpl (eval_op e (Some t0) v0) CIH.
+destr_simpl v2 CIH.
+
+(*FOURTH SIMULATION*)
+
+
+
+
+
+
+
+
+
+
+
+(*SIMULATION*) 
+
+
+(*END*)
+
+
+
+(*
+
+destr_simpl pt CIH.
+destr_simpl i0 CIH.
+destr_simpl (eval_op e None op) CIH.
+destr_simpl fn0 CIH.
+destr_simpl i0 CIH.
+
+(*JUMP*) admit.
+
+
+destr_simpl ptr CIH.
+destr_simpl (eval_op e (Some t0) v) CIH.
+destr_simpl v0 CIH.
+destr_simpl i0 CIH.
+destr_simpl fn0 CIH.
+destr_simpl i0 CIH.
+
+
+(*jump*) admit.
+
+destr_simpl val CIH; destr_simpl ptr CIH.
+destr_simpl (eval_op e (Some t) v) CIH; destr_simpl (eval_op e (Some t0) v0) CIH.
+destr_simpl v2 CIH.
+
+
+specialize (incr_opt (mk_pc fn bk pt)). inversion incr_opt.
+specialize (incr (mk_pc fn bk pt)). inversion incr.*)
+Admitted.
+
+
+
+
+
+
+(*************)
+
+
+Lemma add_instrproof_old : (forall m p s, incr_pc m p = Some s) -> (forall m p s, fetch m p = Some s) -> (forall m fn bk pt, well_formed_program m optimise_program fn bk pt) -> (forall (t:terminator), t = TERM_Ret_void) -> forall st prog mem, trace_equiv (memD mem (sem (optimise_program prog) st)) (memD mem (sem (prog) st)).
+Proof. intros INCRPC FETCH PROGRAM CHECK. pcofix CIH. intros. pfold.
+destruct st.
+destruct p.
+assert (memD mem (sem prog (p, e, s)) = unroll (memD mem (sem prog (p, e, s)))).
+destruct (memD mem (sem prog (p, e, s))); simpl; auto. rewrite H. clear H.
+assert ((memD mem (sem (optimise_program prog) (p, e, s))) = unroll ((memD mem (sem (optimise_program prog) (p, e, s))))).
+destruct ((memD mem (sem (optimise_program prog) (p, e, s)))); simpl; auto. rewrite H. clear H.
+simpl.
+(*
+generalize (FETCH (optimise_program prog) p); intros fetch_opt.
+generalize (FETCH (prog) p); intros fetch.
+
+
+generalize (INCRPC (optimise_program prog) p); intros incr_opt.
+generalize (INCRPC (prog) p); intros incr.*)
+
+rewrite double_fetch_eq.
+rewrite double_incr_pc_eq.
+(*
+rewrite double_fetch_eq in fetch_opt.
+rewrite double_incr_pc_eq in incr_opt.
+
+*)
+destruct p.
+unfold double_fetch in *. simpl in *. unfold double_block_to_cmd_check in *. unfold double_block_to_cmd in *.
+simpl in *. unfold find_instr_double in *. simpl in *.
+unfold block_to_cmd in *.
+
+
+
+
+
+remember (find_function prog fn) as A.
+destr_simpl A CIH.
+destr_simpl d CIH.
+destr_simpl df_instrs CIH. simpl in *.
+remember (find_block blks bk) as B.
+destr_simpl B CIH.
+
+unfold term_check in *.
+destr_simpl b CIH. simpl in *.
+destr_simpl blk_term CIH.
+
+
+generalize (CHECK t). intros.
+unfold blk_term_id in *. simpl in *.
+destr_simpl t CIH; try inversion H.
+unfold is_left in *. simpl in *.
 destr_simpl (decide (i = pt)) CIH; subst.
 destr_simpl s CIH.
 destr_simpl f CIH.
@@ -310,8 +947,35 @@ simpl. (* no instruction on left*) admit.
 destr_simpl fn0 CIH.
 destr_simpl i0 CIH.
 
+rewrite find_function_equiv.
+unfold find_function_entry_double.
+unfold find_function_condition.
+unfold find_function_entry.
+simpl.
+unfold find_function_condition_part.
+simpl.
+unfold is_left.
 
-admit.
+remember (find_function prog id0) as D.
+induction D. simpl.
+remember (find_block (CFG.blks (df_instrs a)) (CFG.init (df_instrs a)) ) as E.
+induction E. simpl.
+simpl.
+unfold term_check. destruct a0. simpl.
+destruct blk_term. simpl.
+unfold blk_entry_id. simpl.
+unfold blk_term_id.
+simpl.
+unfold fallthrough.
+destruct blk_code0; simpl.
+generalize (CHECK t0). intros. induction t0; try inversion H0.
+destruct (decide (i0 = i0)). simpl.
+
+  +destr_simpl (map_monad (fun '(t0, op) => eval_op e (Some t0) op) args) CIH. admit.
+  +assert (i0 = i0) by auto. unfold not in n0. apply n0 in H1. inversion H1.
+  +admit.
+  +destr_simpl (map_monad (fun '(t0, op) => eval_op e (Some t0) op) args) CIH.
+  +simpl; finish CIH.
 
 
 (*SECOND SIMULATION*)
@@ -664,8 +1328,64 @@ destr_simpl fn0 CIH.
 destr_simpl i0 CIH.
 
 
-(*JUMP*) admit.
 
+
+
+
+(********)
+
+rewrite find_function_equiv.
+unfold find_function_entry_double.
+unfold find_function_condition.
+unfold find_function_entry.
+simpl.
+unfold find_function_condition_part.
+simpl.
+unfold is_left.
+simpl.
+
+
+remember (find_function prog id ) as D.
+induction D.
+
+remember (find_block (CFG.blks (df_instrs a)) (CFG.init (df_instrs a))) as E.
+induction E. simpl.
+unfold term_check. unfold blk_entry_id, blk_term_id. simpl. destruct a0.
+destruct blk_term. simpl.
+
+generalize (CHECK t0); intros.
+induction t0; try inversion H0.
+induction blk_code0. simpl.
+
+destr_simpl (decide (i0 = i0)) CIH.
+destr_simpl (map_monad (fun '(t0, op) => eval_op e (Some t0) op) args) CIH.
+destr_simpl t CIH.
+  +admit.
+assert (i0 = i0) by auto.
+unfold not in n1. apply n1 in H1. inversion H1.
+destr_simpl p CIH.
+destr_simpl (decide (i0 = i1) ) CIH.
+destr_simpl (map_monad (fun '(t0, op) => eval_op e (Some t0) op) args) CIH.
+destr_simpl t CIH. (*a case for uniqueness*) admit.
+destr_simpl (map_monad (fun '(t0, op) => eval_op e (Some t0) op) args) CIH.
+
+
+destr_simpl t CIH. admit.
+
+
+
+
+
++admit.
++admit.
+
+
+
+
+
+
+(*4*)
+(*******)
 
 destr_simpl val CIH.
 destr_simpl ptr CIH.
@@ -902,6 +1622,7 @@ admit.
 
 
 Admitted.
+
 
 
 
@@ -1651,4 +2372,4 @@ try_finish. try_finish. try_finish. try_finish. try_finish. try_finish.
         +destruct v. simpl. destruct (eval_op e (Some t) v); try_finish. destruct v0; try_finish. admit. (*jump*)
         +admit.
  Admitted.*)
-*) Admitted. *) *)*) Admitted.
+*) Admitted. *) *)*) *)

@@ -334,8 +334,8 @@ Proof.
   intros X F r H.
   unfold reflexive. intros. right. apply H.
 Qed.
-
 (*
+
 Lemma trace_equiv_refl : reflexive Trace trace_equiv.
 Proof.
   pcofix CIH. intro d.
