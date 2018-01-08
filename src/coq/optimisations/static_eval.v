@@ -63,14 +63,17 @@ Definition get_expr (s:  Ollvm_ast.value) (top:option typ) : err dvalue :=
 Print ibinop.
 Print OP_IBinop.
 Print ibinop.
-Print Add.
+
+
 Definition optimise_expr_op (o:Ollvm_ast.value) : option (Ollvm_ast.value) :=
   match o with
   | SV a => match a with
-            | OP_IBinop (Or) _ _ _ => None
-            | OP_IBinop (Xor) _ _ _ => None
-            | OP_IBinop (LShr _) _ _ _ => None
-            | OP_IBinop (AShr _) _ _ _ => None
+                                            
+            | OP_IBinop (And) _ _ _ => None                                            
+            | OP_IBinop (Shl _ _) _ _ _ => None                                            
+
+                                            
+                                            
             | OP_IBinop iop t op1 op2 => match (get_expr op1 (Some t)), (get_expr op2 (Some t)) with
                                          | (inr b), (inr c)  => eval_iop_decast t iop b c
                                          | (_), (_) => None
@@ -450,124 +453,20 @@ Hint Resolve shr_correct.
 
                               
 Lemma instr_correct : forall e op, eval_op e None (optimise_expr op) =  eval_op e None op.
-Proof. intros. destruct op. unfold optimise_expr. unfold optimise_expr_op. destruct e0; simpl in *; eauto. destruct v1, v2; simpl in *; eauto.
+Proof. intros. destruct op. unfold optimise_expr. unfold optimise_expr_op. destruct e0; simpl in *; eauto. destruct v1, v2; simpl in *; eauto. destruct iop; destruct e0, e1; simpl in *; eauto; destruct t; simpl in *; eauto; destruct sz; simpl in *; eauto; destruct p; simpl in *; eauto; destruct p; simpl in *; eauto; destruct p; simpl in *; eauto; destruct p; simpl in *; eauto; destruct p; simpl in *; eauto; destruct p; simpl in *; eauto;  unfold eval_iop_decast; simpl in *; unfold eval_i32_op; auto.  rewrite Int32.add_zero; try rewrite Int32.repr_unsigned; eauto.
+        rewrite Int32.add_zero; try rewrite Int32.repr_unsigned; eauto.
+        rewrite Int32.add_zero; try rewrite Int32.repr_unsigned; eauto.
+        rewrite Int32.add_zero; try rewrite Int32.repr_unsigned; eauto.
+Qed.
 
 
 
-       destruct e0, e1, t; simpl in *; eauto. try rewrite Int32.add_zero; try rewrite Int32.repr_unsigned; eauto.
-destruct sz; simpl in *; eauto; destruct p; simpl in *; eauto; destruct p; simpl in *; eauto; destruct p; simpl in *; eauto; destruct p; simpl in *; eauto; destruct p; simpl in *; eauto; destruct p; simpl in *; eauto. unfold eval_iop_decast. simpl in *. unfold eval_i32_op. destruct iop; simpl in *; eauto; try rewrite Int32.add_zero; try rewrite Int32.repr_unsigned; auto. 
-       remember ( Int32.unsigned (Int32.repr x0) >=? 32) as A.
-       remember ( (Z.shiftl (Int32.unsigned (Int32.repr x)) (Int32.unsigned (Int32.repr x0)) >?
-                            Int32.unsigned (Int32.shl (Int32.repr x) (Int32.repr x0)))) as B.
-       destruct A, B, nuw, nsw; simpl in *; eauto; unfold eval_i32_op; try rewrite <- HeqA; try rewrite HeqB; eauto; try rewrite Int32.add_zero; try rewrite Int32.repr_unsigned; eauto.
-       +rewrite <- HeqB. simpl in *. auto.
-       +rewrite <- HeqB. simpl in *. auto.
-       +rewrite <- HeqB. simpl in *. remember ( - Int32.unsigned (Int32.repr x0)) as C. destruct C.
-        *remember ( ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) 32 =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))) as D. destruct D. admit. admit.
-         destruct p. destruct p. destruct p. destruct p. destruct p. destruct p. simpl in *.
-          remember (      ~~
-      (Z.shiftr (Int32.unsigned (Int32.repr x))
-         (Z.pos (Pos.succ p)~0~1~1~1~1~1) =?
-       Int32.unsigned
-         (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-       (2 ^ Int32.unsigned (Int32.repr x0) - 1))) as A. destruct A. simpl in *. admit. simpl in *. admit. destruct (  ~~
-      (Z.shiftr (Int32.unsigned (Int32.repr x)) (Z.pos p~1~1~1~1~1~1) =?
-       Int32.unsigned
-         (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-       (2 ^ Int32.unsigned (Int32.repr x0) - 1))). simpl in *. admit. admit. destruct (  ~~
-      (Z.shiftr (Int32.unsigned (Int32.repr x)) 95 =?
-       Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-       (2 ^ Int32.unsigned (Int32.repr x0) - 1))). admit. admit. simpl in *. destruct p. simpl in *. destruct ( ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) (Z.pos (Pos.succ p)~0~0~1~1~1~1) =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))); simpl in *. admit. simpl in *.  admit. 
-destruct (  ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) (Z.pos p~1~0~1~1~1~1) =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))); simpl in *. admit. admit.
-destruct (       ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) 79 =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))). simpl in *. admit. admit.
-destruct ( ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) 63 =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))). admit. admit.
-destruct p. destruct p.   destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) (Z.pos (Pos.succ p)~0~1~0~1~1~1) =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))). admit. admit.
-destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) (Z.pos p~1~1~0~1~1~1) =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))). admit. admit.
-destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) 87 =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))). admit. admit.
-destruct p. destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) (Z.pos (Pos.succ p)~0~0~0~1~1~1) =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))). admit. admit. destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) (Z.pos p~1~0~0~1~1~1) =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))
-). admit. admit. destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) 71 =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))
-). admit. admit. destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) 55 =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))
-). admit. admit. destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) 47 =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))
-                          ). admit. admit.
 
-destruct p. destruct p. destruct p. destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) (Z.pos (Pos.succ p)~0~1~1~0~1~1) =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))). admit. admit.
-destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) (Z.pos p~1~1~1~0~1~1) =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))
-). admit. admit. destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) 91 =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))
-). admit. admit. destruct p. destruct          ( ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) (Z.pos (Pos.succ p)~0~0~1~0~1~1) =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))). admit. admit.
-destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) (Z.pos p~1~0~1~0~1~1) =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))
-). admit. admit. destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) 75 =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))
-). admit. admit. destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) 59 =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))
-).  admit. admit. admit. destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) 43 =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))
-). admit. admit. destruct (          ~~
-          (Z.shiftr (Int32.unsigned (Int32.repr x)) 39 =?
-           Int32.unsigned (Int32.negative (Int32.shl (Int32.repr x) (Int32.repr x0))) *
-           (2 ^ Int32.unsigned (Int32.repr x0) - 1))
-                          ). admit. admit. destruct p. destruct p. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. admit. destruct p. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. destruct p.  destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. admit. admit. admit. destruct p. destruct p. destruct p. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. admit. destruct p. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. admit. admit. destruct p. destruct p. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. admit. destruct p. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. destruct p. destruct p. admit. admit. admit.  destruct p. admit. admit. admit. admit. admit. admit. admit. admit. admit. remember ( - Int32.unsigned (Int32.repr x0)) as C. destruct C. admit. destruct p. destruct p. destruct p. destruct p. destruct p. destruct p. admit. admit. admit. destruct p. admit.
-admit. admit. admit. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. admit. destruct p. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. admit. admit. destruct p. destruct p. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit.admit. destruct p. destruct p. destruct p. admit. admit. admit. destruct p. admit. admit. admit. admit. destruct p. admit. admit. admit. admit. admit. admit. destruct p. admit. destruct p. destruct p. destruct p. destruct p. admit. admit. admit. admit. admit. destruct p. admit. admit. admit. admit. destruct p. admit. admit. admit. admit. admit. admit. admit. destruct ( - Int32.unsigned (Int32.repr x0)). admit. destruct p. destruct p. destruct p. destruct p. destruct p. admit. admit. admit. admit. admit. admit. admit. destruct p. destruct p. admit. admit. admit. admit. admit. admit. destruct p. destruct p. destruct p. destruct p. destruct p. admit. admit. admit. admit. admit. admit. admit. admit. admit. destruct p. destruct p. destruct p. admit. admit. admit. admit. admit. destruct p. destruct p. admit. admit. admit. admit. admit. admit. admit. admit. admit.
-Admitted.
+
+
+
+
+
 
 
 
