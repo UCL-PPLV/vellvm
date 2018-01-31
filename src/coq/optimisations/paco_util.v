@@ -1,8 +1,6 @@
 Require Import ZArith List String Omega.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellvm.CFG.
-Require Import Vellvm.optimisations.wellformedSSA.
 Require Import Vellvm.optimisations.transform.
-Require Import Vellvm.optimisations.add_instr.
 Require Import paco.
 Require Import Vellvm.Memory.
 Require Import Vellvm.Effects.
@@ -12,31 +10,6 @@ Require Import ssreflect ssrbool seq eqtype ssrnat.
 
 
 Print mcfg.
-
-
-
-
-
-Print cfg.
-Print block.
-Print block_id.
-Print raw_id.
-
-Print int.
-
-
-Lemma test : forall n, n + 1 = n + 2.
-Proof. Admitted.
-
-
-
-
-Hint Resolve test.
-
-
-Lemma test1 : forall n, n + 1 = n + 2.
-Proof. auto. Admitted.
-
 
 Definition unroll (t:Trace ()) :=
 match t with
@@ -122,7 +95,44 @@ Qed.
 
 
 
+Print stepD.
 
+Print effects. Print Call.
+
+Definition test_stepD (t:transition state) :=
+  match t with
+  | Step s => true
+  | Jump _ => true
+  | Obs v => match v with
+             | Fin _ => true
+             | Err _ => true
+             | Eff e => match e with
+                        | Call _ _ _ => false
+                        | _ => true
+                                 
+                        end
+                                
+             end
+               
+    end.
+Print stepD.
+Lemma test_stepD_equiv : forall st t p,  stepD st p = t -> test_stepD t = true.
+Proof. intros. unfold test_stepD. unfold stepD in *. simpl in *. destruct p. destruct p. destruct ((fetch st p)); simpl in *. destruct ( (incr_pc st p)). destruct c; simpl in *. destruct p; simpl in *. subst. destruct pt. destruct i; simpl in *; eauto. destruct ( eval_op e None op); simpl in *; eauto. destruct fn0. destruct i; simpl in *; eauto. destruct  (find_function_entry st id0);  simpl in *; eauto. destruct f.  destruct ( map_monad (fun '(t0, op) => eval_op e (Some t0) op) args); simpl in *; eauto. destruct ptr. destruct    ( eval_op e (Some t0) v); simpl in *; eauto.
+destruct v0; simpl in *; eauto. destruct i; simpl in *; eauto. destruct fn0; simpl in *; eauto.
+destruct i; simpl in *; eauto. destruct  (find_function_entry st id); simpl in *; eauto. destruct f. destruct (map_monad (fun '(t0, op) => eval_op e (Some t0) op) args); simpl in *; eauto. destruct t; simpl in *; eauto. destruct val, ptr; simpl in *; eauto. destruct ( eval_op e (Some t) v), ( eval_op e (Some t0) v0); simpl in *; eauto. destruct v2; simpl in *; eauto. subst; destruct t0; simpl in *; eauto. destruct v. destruct (eval_op e (Some t) v); simpl in *; eauto. destruct s; simpl in *; eauto. destruct f; simpl in *; eauto. destruct s; simpl in *; eauto. destruct f; simpl in *; eauto. destruct v. destruct ( eval_op e (Some t) v); simpl in *; eauto. destruct v0; simpl in *; eauto. destruct (StepSemantics.Int1.eq x StepSemantics.Int1.one); simpl in *; eauto.
+destruct (jump st (fn p) (bk p) br1 e s); simpl in *; eauto.
+destruct (jump st (fn p) (bk p) br2 e s); simpl in *; eauto.
+destruct (jump st (fn p) (bk p) br e s); simpl in *; eauto.
+
+subst. simpl in *. destruct c; simpl in *; eauto.
+destruct t; simpl in *; auto. destruct v; simpl in *; eauto. destruct ( eval_op e (Some t) v); simpl in *; eauto. destruct s; simpl in *; eauto. destruct f; simpl in *; eauto. destruct s; simpl in *; eauto. destruct f; simpl in *; eauto. destruct v; simpl in *; eauto. destruct (eval_op e (Some t) v); simpl in *; eauto. destruct v0; simpl in *; eauto. destruct (StepSemantics.Int1.eq x StepSemantics.Int1.one); simpl in *; eauto.
+destruct (jump st (fn p) (bk p) br1 e s); simpl in *; eauto.
+destruct (jump st (fn p) (bk p) br2 e s); simpl in *; eauto.
+destruct (jump st (fn p) (bk p) br e s); simpl in *; eauto.
+subst; simpl in *; eauto. Qed.
+
+
+Hint Resolve test_stepD_equiv.
 
 
 Hint Resolve trace_refl2.
@@ -207,23 +217,8 @@ destruct f; simpl; eauto. Qed.
 
 
 Hint Resolve generic_function_entry_refl.
-Print pc.
 
-(*
-        match
-          match f with
-          | KRet _ _ _ =>
-              t_raise_p p
-                "IMPOSSIBLE: Ret void in non-return configuration"
-          | KRet_void e' p' => Jump (p', e', s)
-          end
-        with
-        | Step s' => Tau (p, e, f :: s) (step_sem prog s')
-        | Jump s' => Tau (p, e, f :: s) (step_sem prog s')
-        | Obs (Fin s0) => Vis (Fin s0)
-        | Obs (Err s0) => Vis (Err s0)
-        | Obs (Eff m) => Vis (Eff (effects_map (step_sem prog) m))
-        end*)
+
 
 Definition jump_solve prog mem e s p br2:=
   match
@@ -268,46 +263,7 @@ Proof. intros. unfold jump_solve. destruct (jump prog (fn p) (bk p) br2 e s); si
 
 Hint Resolve generic_jump_refl.
 
-Lemma trace_refl123 : forall st prog mem, trace_equiv (memD mem (sem (prog) st)) (memD mem (sem (prog) st)).
-Proof. pcofix CIH. intros. pfold.
-assert ((memD mem (sem prog st)) = unroll (memD mem (sem prog st))). destruct (memD mem (sem prog st)); eauto.
-rewrite H. simpl.
-unfold stepD. simpl. destruct st; simpl; eauto. destruct p; simpl; eauto.
-destruct (fetch prog p); simpl; eauto. destruct c; simpl; eauto. destruct (incr_pc prog p); simpl; eauto.
-destruct p; simpl; eauto. destruct pt; simpl; eauto. destruct i; simpl; eauto.
-destruct (eval_op e None op); simpl; eauto.
-destruct (fn0); simpl; eauto. destruct i; simpl; eauto.
 
-destruct ((find_function_entry prog id0)); simpl; eauto.
-destruct (           map_monad (fun '(t0, op) => eval_op e (Some t0) op)); simpl; eauto.
-eapply generic_function_entry_refl; eauto.
-destruct ((find_function_entry prog id0)); simpl; eauto.
-destruct f; simpl; eauto.
-destruct f; simpl; eauto.
-destruct ptr; simpl; eauto.
-destruct (eval_op e (Some t0) v); simpl; eauto.
-destruct v0; simpl; eauto.
-destruct i; simpl; eauto. destruct fn0; simpl; eauto.
-destruct i; simpl; eauto. 
-destruct ((find_function_entry prog id)); simpl; eauto.
-destruct f; simpl; eauto.
-destruct (map_monad (fun '(t0, op) => eval_op e (Some t0) op) args); simpl; eauto.
-destruct t; simpl; eauto.
-destruct val, ptr; simpl; eauto.
 
-destruct (eval_op e (Some t) v); simpl; eauto.
-destruct (eval_op e (Some t0) v0); simpl; eauto.
-destruct v2; simpl; eauto.
-destruct t; simpl; eauto.
-destruct v; simpl; eauto.
-destruct (eval_op e (Some t) v); simpl; eauto.
-destruct s; simpl; eauto.
-destruct f; simpl; eauto.
-destruct s; simpl; eauto.
-destruct f; simpl; eauto.
-destruct v; simpl; eauto.
-destruct (eval_op e (Some t) v); simpl; eauto.
-destruct v0; simpl; eauto.
- destruct (StepSemantics.Int1.eq x StepSemantics.Int1.one); simpl; eauto;
-eapply generic_jump_refl; eauto.
-Admitted.
+Print transition.
+

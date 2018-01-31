@@ -1,4 +1,4 @@
-Require Import Vellvm.StepSemantics.
+(*Require Import Vellvm.StepSemantics.
 Require Import ZArith List String Omega.
 Require Import  Vellvm.Classes Vellvm.Util Vellvm.Memory.
 Require Import Vellvm.Ollvm_ast Vellvm.AstLib Vellvm.CFG Vellvm.Effects.
@@ -129,56 +129,9 @@ do pc_next <- trywith "no fallthrough intsruction" (incr_pc CFG pc);
       end.
 
 
-Definition optimisedstepD (CFG:mcfg) (s:state) : transition state :=
-  let '(pc, e, k) := s in
-  do cmd <- trywith ("CFG has no instruction at " ++ string_of pc) (fetch CFG pc);
-  match cmd with
-  | Term (t) => term_ret_eval CFG t s
-  | CFG.Step insn => CFG_step insn CFG s
-  end.
-
-
-CoFixpoint optimised_step_sem (CFG:mcfg) (s:state) : Trace state :=
-  match (optimisedstepD CFG s) with
-  | Step s' => Tau s (optimised_step_sem CFG s')
-  | Jump s' => Tau s (optimised_step_sem CFG s')
-  | Obs (Err s) => Vis (Err s)
-  | Obs (Fin s) => Vis (Fin s)
-  | Obs (Eff m) => Vis (Eff (effects_map (optimised_step_sem CFG) m))
-  end.
-
-Definition optimised_sem (CFG:mcfg) (s:state) : Trace () := hide_taus (optimised_step_sem CFG s).
-
-
-
-Definition unroll_trace_state (t:Trace state) :=
-match t with
-  | Vis a => Vis a
-  | Tau a b => Tau a b
-end.
-
-Definition unroll_trace (t:Trace ()) :=
-match t with
-  | Vis a => Vis a
-  | Tau a b => Tau a b
-end.
-
-
-(*
-Definition unroll_effects A (e:effects A) :=
-match e with
-  | Alloca a b => Alloca a b
-  | Load a b => Load a b
-
-end.
-
-*)
-
-
 Lemma stepD_equiv : forall CFG s, optimisedstepD CFG s = stepD CFG s.
 Proof.
 intros. unfold stepD. unfold optimisedstepD. destruct s. destruct p.
 destruct (fetch CFG p); simpl; auto.
 Qed.
-
-(*No need for trace equiv proof*)
+*)

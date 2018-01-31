@@ -1,8 +1,6 @@
 Require Import ZArith List String Omega.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellvm.CFG.
-Require Import Vellvm.optimisations.wellformedSSA.
 Require Import Vellvm.optimisations.transform.
-Require Import Vellvm.optimisations.add_instr.
 Require Import Vellvm.optimisations.paco_util.
 Require Import Vellvm.optimisations.optimisation_stepsem.
 Require Import Vellvm.DecidableEquality.
@@ -156,6 +154,11 @@ Proof. intros. inversion H; subst; auto. inversion H2; subst; auto. inversion H4
        inversion H3; subst; auto. inversion H2; subst; auto. Qed.
 
 
+Lemma mini_trace_2r_implies_1l : forall A B C, compare_trace (tau A (fin B)) (fin C) -> B = C.
+Proof. intros. inversion H; subst. inversion H3; subst. auto. Qed.
+
+
+
 Print incr_pc.
 
 (*s l -> option pc*)
@@ -272,3 +275,10 @@ Lemma false_stack : forall (s:seq frame) A,  A :: s = s -> False.
 Proof. intros. induction s.
        +inversion H.
        +apply IHs. inversion H. subst. rewrite H2; auto. Qed.
+
+
+Lemma false_env : forall id v e,  add_env id v e = e -> False.
+Proof. intros. unfold add_env in *. induction e; simpl in *.
+       +inversion H.
+       +apply IHe. inversion H; subst. rewrite H2. rewrite H2. auto. Qed.
+         

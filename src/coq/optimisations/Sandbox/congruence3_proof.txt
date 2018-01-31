@@ -1,0 +1,58 @@
+(*Require Import ZArith List String Omega.
+Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellvm.CFG.
+Require Import Vellvm.optimisations.wellformedSSA.
+Require Import Vellvm.optimisations.transform.
+Require Import Vellvm.optimisations.congruence3_definition.
+Require Import Vellvm.optimisations.congruence3_util.
+
+Require Import Vellvm.optimisations.paco_util.
+Require Import Vellvm.optimisations.step_trace.
+Require Import Vellvm.DecidableEquality.
+Require Import Coq.Logic.FunctionalExtensionality.
+Require Import paco.
+Require Import Vellvm.Memory.
+Require Import Vellvm.Effects.
+From mathcomp.ssreflect
+     Require Import ssreflect ssrbool seq eqtype ssrnat.
+
+Definition startfunc1 fnid A o := find_function (modul_opt o A) fnid.
+
+Definition endfunc1 fnid A := find_function A fnid.
+
+
+Definition targetfunc1 fnid A o :=
+  match endfunc1 fnid A with
+  | Some a => Some (definition_cfg_opt o a)
+  | None => None
+  end.
+
+
+Lemma equiv_func1 : forall A o fnid, find_function (modul_opt o A) fnid = targetfunc1 fnid A o.
+Proof. Admitted.
+
+Definition endfunc d bk := find_block (blks (df_instrs d)) bk.
+
+Print block_opt.
+Definition targetfunc o (d:definition cfg)  bkid :=
+  match endfunc d bkid with
+  | Some a => Some (block_opt o a)
+  | None => None 
+  end.
+
+
+Lemma equiv_func : forall o d df_instrs bk,   find_block (list_block_opt o (blks (df_instrs d))) bk = targetfunc o d bk.
+Proof. Admitted.
+Print correct_instr1.
+
+
+
+Print code_opt.
+Lemma correct_instr_trace1 : forall o m (correct_instr: forall c, correct_instr1 m o c) st mem, trace_equiv (memD mem (sem m st)) (memD mem (sem (modul_opt o m) st)).
+Proof. intro. intro. intro. pcofix CIH. intros. pfold.
+
+       assert ( (memD mem (sem m st)) = unroll  (memD mem (sem m st))). destruct  (memD mem (sem m st)); eauto. rewrite H; clear H.
+
+       assert ( (memD mem (sem (modul_opt o m) st)) = unroll  (memD mem (sem (modul_opt o m) st))). destruct  (memD mem (sem (modul_opt o m) st)); eauto. rewrite H; clear H. simpl in *. destruct st. destruct p. destruct p.
+
+       simpl in *. rewrite equiv_func1. unfold targetfunc1. unfold endfunc1. destruct ( find_function m fn); simpl in *; eauto. rewrite equiv_func. unfold targetfunc. unfold endfunc. destruct ( find_block (blks (df_instrs d)) bk ); simpl in *; eauto. unfold block_to_cmd. simpl in *. destruct b. unfold blk_term_id. simpl in *. destruct blk_term. simpl in *. destruct ( decide (i = pt)); simpl in *; eauto. admit.
+     simpl in *. destruct blk_code. simpl in *. eauto. rewrite <-  code_opt_test.*)

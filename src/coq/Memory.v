@@ -15,7 +15,7 @@ Export SS.
 
 Definition memory := list dvalue.
 Definition undef := DV VALUE_Undef.
-Print state.
+Print state. Print replace.
 Definition mem_step {X} (e:effects X) (m:memory) :=
   match e with
   | Alloca t k =>
@@ -34,6 +34,10 @@ Definition mem_step {X} (e:effects X) (m:memory) :=
 
   | Call _ _ _ => inl e
   end.
+Print mem_step.
+Print instr.
+Print effects.
+
 
 CoFixpoint memD (m:memory) (d:Trace ()) : Trace () :=
   match d with

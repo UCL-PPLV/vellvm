@@ -14,7 +14,7 @@ MENHIR=menhir
 CP=cp
 
 COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp
-OPTIMISATIONFILES := EqNat transform wellformedSSA paco_util donothing add_instr add_instrproof optimisation_stepsem step_trace congruence1 congruence2 static_eval
+OPTIMISATIONFILES := EqNat transform SSA_semantics paco_util donothing optimisation_stepsem step_trace congruence_definition congruence_proof maps lattice kildall static_analysis static_analysis_proof const_prop const_prop_proof
 OLLVMFILES := 
 
 VFILES := $(COQFILES:%=coq/%.v) $(OPTIMISATIONFILES:%=coq/optimisations/%.v)

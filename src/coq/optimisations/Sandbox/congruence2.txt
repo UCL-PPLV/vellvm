@@ -1,8 +1,6 @@
 Require Import ZArith List String Omega.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellvm.CFG.
-Require Import Vellvm.optimisations.wellformedSSA.
 Require Import Vellvm.optimisations.transform.
-Require Import Vellvm.optimisations.add_instr.
 Require Import Vellvm.optimisations.paco_util.
 Require Import Vellvm.optimisations.step_trace.
 Require Import Vellvm.DecidableEquality.
@@ -6298,30 +6296,15 @@ Proof. intro. intro. pcofix CIH. intros. generalize (H0 o m). intro. pfold.
  Proof. intros o m same_hd correct_instr. pcofix CIH. intros. pfold.
          assert (  (memD mem (sem m st)) = unroll   (memD mem (sem m st))). destruct   (memD mem (sem m st)); eauto.
        rewrite H; clear H.
-
        assert ((memD mem (sem (modul_opt o m) st)) = unroll  (memD mem (sem (modul_opt o m) st))). destruct  (memD mem (sem (modul_opt o m) st)); eauto. rewrite H; clear H.
-
        destruct st. destruct p. destruct p. specialize (correct_instr fn bk). 
-
-(**)
-
        unfold correct_instr1 in correct_instr.
        specialize (correct_instr mem s e).  simpl in *. unfold compare_exec1 in *. simpl in *.
-
-
-      
-       
        simpl in *. rewrite equiv_func1.  unfold targetfunc1 in *; unfold endfunc1 in *.
        remember ( find_function m fn) as findfunc. destruct findfunc; simpl in *; eauto.
        generalize (Heqfindfunc). intro. apply test in  Heqfindfunc0. subst. simpl in *.
      rewrite equiv_func. unfold targetfunc in *. unfold endfunc in *. remember ( find_block (blks (df_instrs d)) bk) as findblock. destruct findblock; simpl in *; eauto. generalize Heqfindblock. intros.  apply test1 in Heqfindblock0. unfold block_to_cmd in *. destruct b. simpl in *. unfold blk_term_id in *. simpl in *. destruct blk_term. simpl in *. subst. destruct (decide (i = pt)); simpl in *; subst. eauto.  
-
-       
-
-       
-
-       
-       clear Heqfindblock.
+      clear Heqfindblock.
       induction blk_code; simpl in *; eauto. 
 
 

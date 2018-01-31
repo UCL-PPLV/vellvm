@@ -3,6 +3,7 @@ Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellv
 Require Import Vellvm.optimisations.wellformedSSA.
 Require Import Vellvm.optimisations.transform.
 Require Import Vellvm.optimisations.add_instr.
+
 Require Import Vellvm.optimisations.paco_util.
 Require Import Vellvm.optimisations.step_trace.
 Require Import Vellvm.DecidableEquality.
@@ -16,8 +17,10 @@ From mathcomp.ssreflect
 
 Definition opt := pc -> mcfg -> instr -> seq instr.
 
-Print raw_id.
-Print instr_id.
+
+
+
+
 Fixpoint get_max (c:code) (i:option int) :=
   match c, i with
   | nil, _ => i
@@ -52,10 +55,12 @@ Definition create_code (s:seq instr) (i:int) (iid:instr_id) :=
 
 Print pc.
 
+Lemma fetch_false : forall blk_code i i0 i1, find_instr blk_code (int_to_ins (get_next ((i0, i1) :: blk_code))) i = None. Proof. Admitted. 
+
+
+
 
 Definition build_opt (o:opt) (p:pc) (m:mcfg) (i:instr) (ins:int) := create_code (o p m i) ins (pt p).
-
-
 
 Definition mkpc (fn:function_id) (bk:block_id) (pt:instr_id) : pc := mk_pc fn bk pt.
 
@@ -78,12 +83,6 @@ Definition cfg_opt (o:opt) (m:mcfg) (fn:function_id) (c:cfg) : cfg := mkCFG (ini
 
 Definition function_id_of_dec (d:declaration) : function_id := (dc_name d).
 
-
-
-
-
-
-
 Definition definition_cfg_opt (o:opt) (m:mcfg) (d:definition cfg) : definition cfg := mk_definition cfg (df_prototype d) (df_args d) (cfg_opt o m (function_id_of_dec (df_prototype d)) (df_instrs d)).
 
 
@@ -96,87 +95,32 @@ Definition modul_opt (o:opt) (m:mcfg) := mk_modul cfg (m_name m) (m_target m) (m
 Definition mk_state (p:pc) (e:env) (s:stack) : state := (p, e, s).
 
 
-Definition correct_instr1 m o fid bid := forall mem s e iid i t int_ins, compare_exec1 m (modul_opt o m) (cons (iid, i) nil)
-
-                                                                               (build_opt o (mk_pc fid bid iid) m i int_ins) mem (mk_state (mk_pc fid bid iid) e s) t.
-
-
-
-Definition startfunc1 fnid A o := find_function (modul_opt o A) fnid.
-
-Definition endfunc1 fnid A := find_function A fnid.
-
-
-Definition targetfunc1 fnid A o :=
-  match endfunc1 fnid A with
-  | Some a => Some (definition_cfg_opt o A a)
-  | None => None
-  end.
-
-
-Lemma equiv_func1 : forall A o fnid, find_function (modul_opt o A) fnid = targetfunc1 fnid A o.
-Proof. Admitted.
-
-Definition startfunc d m o bk :=                  find_block
-                   (list_block_opt o m (function_id_of_dec (df_prototype d))
-                      (blks (df_instrs d))) bk.
-
-Definition endfunc d bk := find_block (blks (df_instrs d)) bk.
-
-
-Definition targetfunc o m (d:definition cfg)  bkid :=
-  match endfunc d bkid with
-  | Some a => Some (block_opt o m (function_id_of_dec (df_prototype d)) a)
-  | None => None 
-  end.
-
-
-Lemma equiv_func : forall o m d df_instrs bk,  find_block
-                   (list_block_opt o m (function_id_of_dec (df_prototype d))
-                      (blks (df_instrs d))) bk = targetfunc o m d bk.
-Proof. Admitted.
-
-
-
 
 Definition check_size (l:code) :=
   match l with
   | nil => True
   | cons _ nil => True
-  | cons _ ( cons _ nil) => True
   | _ => False
   end.
 
-Print build_opt.
 
 
- Lemma correct_instr_trace1 : (forall o fid bid iid m i int_ins, check_size (build_opt o (mk_pc fid bid iid) m i int_ins)) ->(forall o m fid bid, correct_instr1 m o fid bid) -> forall o m st mem, trace_equiv (memD mem (sem m st)) (memD mem (sem (modul_opt o m) st)).
-Proof. intro. intro. intro.  pcofix CIH. intros. pfold.
-
-       assert ( (memD mem (sem m st)) = unroll  (memD mem (sem m st))). destruct  (memD mem (sem m st)); eauto. rewrite H1. clear H1.
-
-       assert (  (memD mem (sem (modul_opt o m) st)) = unroll   (memD mem (sem (modul_opt o m) st))). destruct   (memD mem (sem (modul_opt o m) st)); eauto. rewrite H1. clear H1.
-
-
-       simpl in *. destruct st. simpl in *. destruct p. destruct p. simpl in *. rewrite equiv_func1. unfold targetfunc1. unfold endfunc1.
+Definition correct_instr1 m o fid bid := forall mem s e iid i t int_ins, compare_exec1 m (modul_opt o m) (cons (iid, i) nil) (build_opt o (mk_pc fid bid iid) m i int_ins) mem (mk_state (mk_pc fid bid iid) e s) t.
 
 
 
-       specialize (H o). specialize (H0 o m). destruct ( find_function m fn); simpl in *; eauto.
-       rewrite equiv_func. unfold targetfunc. unfold endfunc. simpl in *. destruct (find_block (blks (df_instrs d)) bk); simpl in *; eauto. unfold block_to_cmd. unfold blk_term_id. simpl in *. destruct b. simpl in *. destruct blk_term. simpl in *. destruct ( decide (i = pt) ); simpl in *; eauto. admit. unfold code_opt in *.
+Definition find_block_entry_pc (m:mcfg) (fid:function_id) (bid:block_id) :=
+  match find_block_entry m fid bid with
+  | None => None
+  | Some (BlockEntry _ p) => Some p
+  end.
+
+Inductive wf_pc : mcfg -> pc -> Prop :=
+| block_start_pc : forall m p, find_block_entry_pc m (fn p) (bk p) = Some p -> wf_pc m p
+| block_continue_pc : forall m p p1, wf_pc m p1 -> incr_pc m p1 = Some p -> wf_pc m p.
 
 
-specialize (H0  (function_id_of_dec (df_prototype d)) blk_id).
+Definition pc_of_state (s:state) : pc := 
+  let (p1, s1) := s in
+  let (p, e) := p1 in p.
 
-
-
-
-
-
-unfold correct_instr1 in H0. specialize (H0 mem s e).
-destruct blk_code. simpl in *; eauto.
-
-
-
-simpl in *. destruct p.
-Admitted.
