@@ -14,11 +14,13 @@ MENHIR=menhir
 CP=cp
 
 COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp
-OPTIMISATIONFILES := EqNat transform SSA_semantics paco_util donothing optimisation_stepsem step_trace congruence_definition congruence_proof maps lattice kildall static_analysis static_analysis_proof const_prop const_prop_proof
+OPTIMISATIONFILES := EqNat donothing map_spec maps optimisation_stepsem paco_util SSA_semantics step_trace transform vellvm_tactics
+KILDALLFILES := lattice kildall congruence_definition_kildall congruence_proof_kildall const_prop_kildall static_eval_kildall static_eval_valueanalysis static_eval_valuedomain
+STATICANALYSISFILES := static_analysis static_analysis_proof congruence_definition congruence_proof const_prop
 OLLVMFILES := 
 
-VFILES := $(COQFILES:%=coq/%.v) $(OPTIMISATIONFILES:%=coq/optimisations/%.v)
-VOFILES := $(COQFILES:%=coq/%.vo) $(OPTIMISATIONFILES:%=coq/optimisations/%.vo)
+VFILES := $(COQFILES:%=coq/%.v) $(OPTIMISATIONFILES:%=coq/optimisations/%.v) $(KILDALLFILES:%=coq/optimisations/Kildall/%.v)  $(STATICANALYSISFILES:%=coq/optimisations/StaticAnalysis/%.v)
+VOFILES := $(COQFILES:%=coq/%.vo) $(OPTIMISATIONFILES:%=coq/optimisations/%.vo) $(KILDALLFILES:%=coq/optimisations/Kildall/%.vo)  $(STATICANALYSISFILES:%=coq/optimisations/StaticAnalysis/%.vo)
 
 all:
 	@test -f .depend || $(MAKE) depend

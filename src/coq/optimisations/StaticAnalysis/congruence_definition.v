@@ -3,7 +3,7 @@ Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellv
 Require Import Vellvm.optimisations.transform.
 Require Import Vellvm.optimisations.paco_util.
 Require Import Vellvm.optimisations.step_trace.
-Require Import Vellvm.optimisations.static_analysis.
+Require Import Vellvm.optimisations.StaticAnalysis.static_analysis.
 Require Import Vellvm.optimisations.SSA_semantics.
 
 Require Import Vellvm.DecidableEquality.
@@ -261,7 +261,43 @@ Print state.
 
 
 
+Print individual_step.
 Definition correct_instr (o:opt) (m:mcfg) :=
   forall fn bk id instr e (k:stack) pc_next (wf_prog: wf_program m) (sstate: sound_state m ((mk_pc fn bk id), e, k)),
     individual_step m (mk_pc fn bk id) (o (mk_pc fn bk id) m (id, instr)) e (mk_pc fn bk pc_next) k =  individual_step m (mk_pc fn bk id) instr e  (mk_pc fn bk pc_next) k.
-                    
+
+
+
+
+Print finish_item.
+Print individual_step.
+Definition exec_code1 (mem:memory) (m:mcfg) (fn:function_id) (bk:block_id) (id:instr_id) (instr:instr) (pc_next:instr_id) (k:stack) (e:env) :=
+  match (individual_step m (mk_pc fn bk id) (instr) e (mk_pc fn bk pc_next) k) with
+  | Step s' => tauitem mem s'
+  | Jump s' => tauitem mem s'
+  | Obs o => match o with
+             | Fin f => visitem mem (Fin f)
+             | Err f => visitem mem (Err f)
+             | Eff f => match mem_step f mem with
+                        | inl _ => visitem mem (Err "err")
+                        | inr (m', v, k) => tauitem m' (k v)
+                        end
+                          
+                                
+             end
+               
+ end    
+.
+Inductive eq_result : finish_item state -> finish_item state -> Prop :=
+| tau_eq : forall mem s,  eq_result (tauitem mem s) (tauitem mem s)
+| finish_eq : forall mem s, eq_result (visitem mem (Fin s)) (visitem mem (Fin s))
+| err_eq : forall mem mem1 s s1, eq_result (visitem mem1 (Err s)) (visitem mem (Err s1))
+.
+
+
+
+
+Definition correct_instr1 (o:opt) (m:mcfg) :=
+  forall mem fn bk id instr e (k:stack) pc_next (wf_prog: wf_program m) (sstate: sound_state m ((mk_pc fn bk id), e, k)),
+    eq_result (exec_code1 mem m fn bk id instr pc_next k e)
+              (exec_code1 mem m fn bk id (o (mk_pc fn bk id) m (id, instr)) pc_next k e).

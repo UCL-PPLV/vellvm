@@ -7,6 +7,8 @@ Require Import Vellvm.DecidableEquality.
 Require Import paco.
 Require Import Vellvm.Memory.
 Require Import Vellvm.Effects.
+Require Import Vellvm.CFGProp.
+
 From mathcomp.ssreflect
 Require Import ssreflect ssrbool seq eqtype ssrnat.
 

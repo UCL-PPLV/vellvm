@@ -27,7 +27,7 @@ SearchAbout trace_equiv.
 
 Require Import compcert.lib.Integers.
 
-
+(*
 
 
 Definition get_int_from_int1 (i:int1) : Ollvm_ast.int := Int1.unsigned i.
@@ -479,4 +479,4 @@ Proof. intros. apply correct_instr_trace2; intros.
  unfold find_function_entry. simpl in *.  rewrite equiv_func1. unfold targetfunc1. unfold endfunc1. destruct (find_function m id); simpl in *; eauto. simpl in *. rewrite equiv_func. unfold targetfunc. unfold endfunc. destruct  (find_block (blks (df_instrs d)) (init (df_instrs d))); simpl in *; eauto. destruct t0; simpl in *; eauto. simpl in *. simpl in *. destruct (map_monad (fun '(t0, op) => eval_op e (Some t0) op) args); simpl in *; eauto. unfold blk_entry_id. simpl in *. unfold optimisation. simpl in *. unfold code_opt. simpl in *. unfold blk_term_id. simpl in *. destruct b. simpl in *. destruct blk_code. auto. simpl in *. destruct p. simpl in *. auto.
 Qed.
 
-
+*)

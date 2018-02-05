@@ -14,7 +14,7 @@ Require Import Vellvm.Effects.
 From mathcomp.ssreflect
 Require Import ssreflect ssrbool seq eqtype ssrnat.
 
-Require Import Vellvm.optimisations.static_analysis.
+Require Import Vellvm.optimisations.StaticAnalysis.static_analysis.
 
 
 (*An abstract register implies there is a list of  previous and succeeding registers*)
@@ -245,20 +245,19 @@ Proof. induction l2.
 (*********************************************************************************)
 (*Proving the preservation for the static analysis*)
 
-
-Lemma substring_nil_add : forall id b v e,  substring (value_analysis (prep_block b) (IId id)) e ->
-                                        substring ((id, None) :: value_analysis (prep_block b) (IId id)) (add_env id v e).
+Lemma substring_nil_add : forall id b v e,  substring (value_analysis (prep_block b) (IId id)) e = true  ->
+                                        substring ((id, None) :: value_analysis (prep_block b) (IId id)) (add_env id v e) = true.
 Proof. intros. simpl. unfold beq_local_id. unfold decide. simpl in *. destruct ( eq_dec_local_id id id ); simpl in *; eauto. Qed.
 Hint Resolve substring_nil_add.
 
-Lemma substring_add_item : forall id b e x, substring (value_analysis (prep_block b) (IId id)) e -> substring
+Lemma substring_add_item : forall id b e x, substring (value_analysis (prep_block b) (IId id)) e = true -> substring
     ((id, Some x)
      :: value_analysis (prep_block b) (IId id))
     (add_env id x e).
 Proof. intros. simpl in *. unfold beq_local_id. unfold beq_value. unfold decide. destruct ( eq_dec_local_id id id), (eq_dvalue x x); simpl in *; eauto. Qed.
 Hint Resolve substring_add_item.
 
-Lemma substring_start_block : forall b0 l, substring (value_analysis (prep_block b0) (blk_entry_id b0)) l. Proof. intros. unfold prep_block. unfold blk_entry_id. unfold blk_term_id in *. unfold value_analysis. destruct b0. simpl in *. unfold fallthrough. simpl in *. destruct blk_code; simpl in *; eauto; unfold is_left. destruct ( decide (fst blk_term = fst blk_term)), l; simpl in *; eauto. destruct p; simpl in *. destruct ( decide (i = i)), l; simpl in *; eauto. Qed.
+Lemma substring_start_block : forall b0 l, substring (value_analysis (prep_block b0) (blk_entry_id b0)) l = true. Proof. intros. unfold prep_block. unfold blk_entry_id. unfold blk_term_id in *. unfold value_analysis. destruct b0. simpl in *. unfold fallthrough. simpl in *. destruct blk_code; simpl in *; eauto; unfold is_left. destruct ( decide (fst blk_term = fst blk_term)), l; simpl in *; eauto. destruct p; simpl in *. destruct ( decide (i = i)), l; simpl in *; eauto. Qed.
 Hint Resolve substring_start_block.
 
 

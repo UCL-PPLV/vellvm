@@ -130,8 +130,12 @@ end.
 
 
 
+(******VALUE*)
 
 
 
 
 
+
+Print instr.
+Print Ollvm_ast.value.

@@ -1,20 +1,23 @@
 Require Import Vellvm.optimisations.maps.
-Require Import Vellvm.optimisations.lattice.
+Require Import Vellvm.optimisations.Kildall.lattice.
 Require Import Coqlib.
-Require Import Vellvm.CFG.
+Require Import Vellvm.CFG Vellvm.CFGProp Vellvm.Effects Vellvm.Memory.
 Require Import compcert.lib.Iteration.
-
+Require Import Vellvm.StepSemantics.
+Require Import Vellvm.optimisations.step_trace.
 
 Local Unset Elimination Schemes.
 Local Unset Case Analysis Schemes.
 
+Print mcfg.
+Print stack.
 Module Type NODE_SET.
 
   Parameter t: Type.
   Parameter empty: t.
   Parameter add: pc -> t -> t.
   Parameter pick: t -> option (pc * t).
-  Parameter all_nodes: forall {A: Type}, PCTree.t A -> t.
+  Parameter all_nodes: mcfg -> t.
 
   Parameter In: pc -> t -> Prop.
   Axiom empty_spec:
@@ -27,20 +30,19 @@ Module Type NODE_SET.
     forall s n s', pick s = Some(n, s') ->
     forall n', In n' s <-> n = n' \/ In n' s'.
   Axiom all_nodes_spec:
-    forall A (code: PCTree.t A) n instr,
-    PCTree.get n code = Some instr -> In n (all_nodes code).
+    forall code n instr,
+    fetch code n = Some instr -> In n (all_nodes code).
 
 End NODE_SET.
 
-
+Print cmd.
 Section REACHABLE.
-
-Context {A: Type} (code: PCTree.t A) (successors: A -> list pc).
+Context (fetch: mcfg -> pc -> option cmd) (code: mcfg) (successors:  mcfg -> pc -> list pc).
 
 Inductive reachable: pc -> pc -> Prop :=
   | reachable_refl: forall n, reachable n n
   | reachable_left: forall n1 n2 n3 i,
-      code!n1 = Some i -> In n2 (successors i) -> reachable n2 n3 ->
+      fetch code n1 = Some i -> In n2 (successors code n1) -> reachable n2 n3 ->
       reachable n1 n3.
 
 Scheme reachable_ind := Induction for reachable Sort Prop.
@@ -54,8 +56,8 @@ Proof.
 Qed.
 
 Lemma reachable_right:
-  forall n1 n2 n3 i,
-  reachable n1 n2 -> code!n2 = Some i -> In n3 (successors i) ->
+  forall  n1 n2 n3 i,
+  reachable n1 n2 -> fetch code n2 = Some i -> In n3 (successors code n2) ->
   reachable n1 n3.
 Proof.
   intros. apply reachable_trans with n2; auto. econstructor; eauto. constructor.
@@ -71,10 +73,11 @@ Module Dataflow_Solver (LAT: SEMILATTICE) (NS: NODE_SET).
   Section Kildall.
 
 
-    Context {A: Type}.
-Variable code: PCTree.t A.
-Variable successors: A -> list pc.
-Variable transf: pc -> L.t -> L.t.
+    Context {A: Type} (*LATTICE*)  {B: Type}. (*CODE*)
+    Variable code: mcfg. (*MCFG*)
+    Variable fetch : mcfg -> pc -> option cmd. (*MCFG -> PC -> INSTR*)
+    Variable successors:  mcfg -> pc -> list pc.
+Variable transf: mcfg -> pc -> L.t -> L.t.
 
 
 Record state : Type :=
@@ -110,6 +113,7 @@ Fixpoint propagate_succ_list (s: state) (out: L.t) (succs: list pc)
   | n :: rem => propagate_succ_list (propagate_succ s out n) out rem
   end.
 
+Print fetch.
 
 
 Definition step (s: state) : PCMap.t L.t + state :=
@@ -117,14 +121,14 @@ Definition step (s: state) : PCMap.t L.t + state :=
   | None =>
       inl _ (L.bot, s.(aval))
   | Some(n, rem) =>
-      match PCTree.get n code with
+      match fetch code n with
       | None =>
           inr _ {| aval := s.(aval); worklist := rem; visited := s.(visited) |}
       | Some instr =>
           inr _ (propagate_succ_list
                   {| aval := s.(aval); worklist := rem; visited := s.(visited) |}
-                  (transf n (abstr_value n s))
-                  (successors instr))
+                  (transf code n (abstr_value n s))
+                  (successors code n))
       end
   end.
 
@@ -150,16 +154,16 @@ Definition start_state_nodeset (enodes: NS.t) :=
 Definition fixpoint_nodeset (enodes: NS.t) :=
   fixpoint_from (start_state_nodeset enodes).
 
-
+(*
 Definition start_state_allnodes :=
   {| aval := PCTree.empty L.t; worklist := NS.all_nodes code; visited := fun n => exists instr, PCTree.get n code = Some instr|}.
-
+*)
 
 Definition fixpoint (enode: pc) (eval: L.t) :=
   fixpoint_from (start_state enode eval).
-
+(*
 Definition fixpoint_allnodes := fixpoint_from start_state_allnodes.
-
+*)
 
 Inductive optge: option L.t -> option L.t -> Prop :=
 | optge_some: forall l l', L.ge l l' -> optge (Some l) (Some l')
@@ -303,7 +307,7 @@ Proof.
   intros. destruct (step a) eqn:E.
   exists a; split; auto.
   unfold step in E. destruct (NS.pick (worklist a)) as [[n rem]|].
-  destruct (code!n); discriminate.
+  destruct (fetch code n); discriminate.
   inv E. auto.
   eapply steps_right; eauto.
   constructor.
@@ -315,14 +319,14 @@ Lemma step_incr:
 Proof.
     unfold step; intros.
   destruct (NS.pick (worklist s1)) as [[p rem] | ]; try discriminate.
-  destruct (code!p) as [instr|]; inv H.
+  destruct (fetch code p) as [instr|]; inv H.
   + generalize (propagate_succ_list_charact
-                     (transf p (abstr_value p s1))
-                     (successors instr)
+                     (transf code p (abstr_value p s1))
+                     (successors code p)
                      {| aval := aval s1; worklist := rem; visited := visited s1 |}).
       simpl.
       set (s' := propagate_succ_list {| aval := aval s1; worklist := rem; visited := visited s1 |}
-                    (transf p (abstr_value p s1)) (successors instr)).
+                    (transf code p (abstr_value p s1)) (successors code p)).
       intros (A1 & A2 & A3 & A4 & A5 & A6 & A7 & A8 & A9).
       auto.
   + split. apply optge_refl. auto.
@@ -345,8 +349,8 @@ Record good_state (st: state) : Prop := {
     st.(visited) n ->
     NS.In n st.(worklist) \/
     (forall i s,
-     code!n = Some i -> In s (successors i) ->
-     optge st.(aval)!s (Some (transf n (abstr_value n st))));
+     (fetch code n) = Some i -> In s (successors code n) ->
+     optge st.(aval)!s (Some (transf code n (abstr_value n st))));
   gs_defined: forall n v,
     st.(aval)!n = Some v -> st.(visited) n
 }.
@@ -356,18 +360,18 @@ Record good_state (st: state) : Prop := {
 Lemma step_state_good:
   forall st pc rem instr,
   NS.pick st.(worklist) = Some (pc, rem) ->
-  code!pc = Some instr ->
+  (fetch code pc) = Some instr ->
   good_state st ->
   good_state (propagate_succ_list (mkstate st.(aval) rem st.(visited))
-                                  (transf pc (abstr_value pc st))
-                                  (successors instr)).
+                                  (transf code pc (abstr_value pc st))
+                                  (successors code pc)).
 Proof.
   intros until instr; intros PICK CODEAT [GOOD1 GOOD2].
   generalize (NS.pick_some _ _ _ PICK); intro PICK2.
-  set (out := transf pc (abstr_value pc st)).
-  generalize (propagate_succ_list_charact out (successors instr) {| aval := aval st; worklist := rem; visited := visited st |}).
+  set (out := transf code pc (abstr_value pc st)).
+  generalize (propagate_succ_list_charact out (successors code pc) {| aval := aval st; worklist := rem; visited := visited st |}).
   set (st' := propagate_succ_list {| aval := aval st; worklist := rem; visited := visited st |} out
-                                  (successors instr)).
+                                  (successors code pc)).
   simpl; intros (A1 & A2 & A3 & A4 & A5 & A6 & A7 & A8 & A9).
   constructor; intros.
 - (* stable *)
@@ -395,7 +399,7 @@ Lemma step_state_good_2:
   forall st pc rem,
   good_state st ->
   NS.pick (worklist st) = Some (pc, rem) ->
-  code!pc = None ->
+  (fetch code pc) = None ->
   good_state (mkstate st.(aval) rem st.(visited)).
 Proof.
   intros until rem; intros [GOOD1 GOOD2] PICK CODE.
@@ -418,7 +422,7 @@ Proof.
 - auto.
 - unfold step in e.
   destruct (NS.pick (worklist s2)) as [[n rem] | ] eqn:PICK; try discriminate.
-  destruct (code!n) as [instr|] eqn:CODE; inv e.
+  destruct (fetch code n) as [instr|] eqn:CODE; inv e.
   eapply step_state_good; eauto.
   eapply step_state_good_2; eauto.
 Qed.
@@ -429,6 +433,9 @@ Proof.
   intros. unfold start_state; constructor; simpl; intros.
 - subst n. rewrite NS.add_spec; auto. destruct ( PCTree.elt_eq enode n); subst. auto. inversion H.
 Qed.
+
+
+
 Lemma start_state_nodeset_good:
   forall enodes, good_state (start_state_nodeset enodes).
 Proof.
@@ -436,35 +443,37 @@ Proof.
 - left. auto.
 - inversion H.
 Qed.
-
+(*
 Lemma start_state_allnodes_good:
   good_state start_state_allnodes.
 Proof.
   unfold start_state_allnodes; constructor; simpl; intros.
 - destruct H as [instr CODE]. left. eapply NS.all_nodes_spec; eauto.
 - inversion H.
-Qed.
+Qed.*)
+Print reachable.
 
 Lemma reachable_visited:
   forall st, good_state st -> NS.pick st.(worklist) = None ->
-  forall p q, reachable code successors p q -> st.(visited) p -> st.(visited) q.
+  forall p q, reachable fetch code successors p q -> st.(visited) p -> st.(visited) q.
 Proof.
-  intros st [GOOD1 GOOD2] PICK. induction 1; intros.
+  
+  intros st [GOOD1 GOOD2]  PICK. induction 1; intros.
 - auto.
 - eapply IHreachable; eauto.
   exploit GOOD1; eauto. intros [P | P].
   eelim NS.pick_none; eauto.
-  exploit P; eauto. intros OGE; inv OGE. eapply GOOD2; eauto.
+  exploit P; eauto. 
+  intros OGE; inv OGE; eapply GOOD2; eauto.
 Qed.
-
 
 Theorem fixpoint_solution:
   forall ep ev res n instr s,
   fixpoint ep ev = Some res ->
-  code!n = Some instr ->
-  In s (successors instr) ->
-  (forall n, L.eq (transf n L.bot) L.bot) ->
-  L.ge res!!s (transf n res!!n).
+  fetch code n = Some instr ->
+  In s (successors code n) ->
+  (forall n, L.eq (transf code n L.bot) L.bot) ->
+  L.ge res!!s (transf code n res!!n).
 Proof.
   unfold fixpoint; intros.
   exploit fixpoint_from_charact; eauto. intros (st & STEPS & PICK & RES).
@@ -489,7 +498,7 @@ Proof.
   rewrite RES; unfold PCMap.get; simpl. inv P; auto. contradiction n; eauto.
 Qed.
 
-
+(*
 Theorem fixpoint_allnodes_solution:
   forall res n instr s,
   fixpoint_allnodes = Some res ->
@@ -506,17 +515,17 @@ Proof.
   exploit P; eauto. intros OGE. rewrite RES; unfold PCMap.get; simpl.
   inv OGE. assumption.
 Qed.
+*)
 
-
-
+Print reachable.
 Theorem fixpoint_nodeset_solution:
   forall enodes res e n instr s,
   fixpoint_nodeset enodes = Some res ->
   NS.In e enodes ->
-  reachable code successors e n ->
-  code!n = Some instr ->
-  In s (successors instr) ->
-  L.ge res!!s (transf n res!!n).
+  reachable fetch code successors e n ->
+  fetch code n = Some instr ->
+  In s (successors code n) ->
+  L.ge res!!s (transf code n res!!n).
 Proof.
   unfold fixpoint_nodeset; intros.
   exploit fixpoint_from_charact; eauto. intros (st & STEPS & PICK & RES).
@@ -531,14 +540,12 @@ Proof.
   inv OGE. assumption.
 Qed.
 
-
-
 Theorem fixpoint_invariant:
   forall ep ev
     (P: L.t -> Prop)
     (P_bot: P L.bot)
     (P_lub: forall x y, P x -> P y -> P (L.lub x y))
-    (P_transf: forall pc instr x, code!pc = Some instr -> P x -> P (transf pc x))
+    (P_transf: forall pc instr x, fetch code pc = Some instr -> P x -> P (transf code pc x))
     (P_entrypoint: P ev)
     res pc,
   fixpoint ep ev = Some res ->
@@ -574,7 +581,7 @@ Proof.
     induction 1; intros.
     auto.
     unfold step in e. destruct (NS.pick (worklist s2)) as [[n rem]|]; try discriminate.
-    destruct (code!n) as [instr|] eqn:INSTR; inv e.
+    destruct (fetch code n) as [instr|] eqn:INSTR; inv e.
     apply H2. apply IHsteps; auto. eapply P_transf; eauto. apply IHsteps; auto.
     apply IHsteps; auto.
   }

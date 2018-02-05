@@ -808,6 +808,23 @@ Fixpoint jump (CFG:cfg) (from:block_id) (e_init:env) (e:env) (to:block) (k:stack
 *)
 
 Locate find_block_entry.
+Definition test iid e e_init t ls bid_src :=
+      match assoc RawID.eq_dec bid_src ls with
+      | Some op =>
+        'dv <- eval_op e_init (Some t) op;
+          mret (add_env iid dv e)
+      | None => failwith ("jump: block " ++ string_of bid_src ++ " not found in " ++ string_of iid)
+      end.
+Print test. Print monad_fold_right.
+
+
+
+
+
+
+
+
+Print RawID.eq_dec.
 Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (e_init:env) (k:stack)  : err state :=
   let eval_phi (e:env) '(iid, Phi t ls) :=
       match assoc RawID.eq_dec bid_src ls with

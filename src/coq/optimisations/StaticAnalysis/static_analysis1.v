@@ -14,6 +14,8 @@ From mathcomp.ssreflect
 Require Import ssreflect ssrbool seq eqtype ssrnat.
 
 
+
+Print memory.
 (*Definition of an abstract register*)
 Definition areg : Set := (local_id * option value).
 
@@ -90,8 +92,7 @@ Definition prep_selected_block (m:mcfg) (p:pc) :=
                    
   end.
 
-Print SV.
-Print Expr.
+
 
 
 (*The transfer function which adds values to the abstract registers *)
@@ -101,12 +102,6 @@ Definition transfer (a: aenv) (i: instr_id * cmd) : aenv :=
                     | INSTR_Op val => match val with
                                       | SV s_value => match s_value with
                                                       | VALUE_Integer n => (loc, Some (DV (VALUE_Integer n))) :: a
-                                                      | VALUE_Float n => (loc, Some (DV (VALUE_Float n))) :: a
-                                                      | VALUE_Bool n => (loc, Some (DV (VALUE_Bool n))) :: a
-                                                      | VALUE_Null => (loc, Some (DV (VALUE_Null))) :: a
-                                                      | VALUE_Zero_initializer => (loc, Some (DV (VALUE_Zero_initializer))) :: a
-                                                      | VALUE_Cstring n => (loc, Some (DV (VALUE_Cstring n))) :: a
-                                                      | VALUE_None => (loc, Some (DV (VALUE_None))) :: a
                                                       | _ => (loc, None) :: a
                                                         end
                                       end
