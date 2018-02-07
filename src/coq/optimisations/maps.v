@@ -19,12 +19,6 @@ Local Unset Case Analysis Schemes.
 Set Implicit Arguments.
 
 
-
-
-
-
-Print test.
-
 Module PCTree <: TREE.
   Definition elt := pc.
   Definition pc_eq (a b: pc):= decide (a = b).
@@ -115,21 +109,21 @@ Hint Resolve grs.
     Variable A: Type.
     Variable beqA: A -> A -> bool.
 
-
+(*
     Definition bsingle_empty A (a: (elt * option A)) :=
       match a with
-      | (key, Some item) => true
-      | _ => false
+      | (key, _) => false
+      | _ => true
                
       end.
-    
+ *)
+    (*
     Fixpoint bempty (m: t A) : bool :=
       match m with
       | nil => true
       | hd :: tl => bsingle_empty hd && bempty tl
       end.
-
-
+*)
     Definition beq_single (a b :(elt * option A)) : bool :=
       match a, b with
       | (key, None), (key1, None) => (elt_eq key key1)
@@ -137,25 +131,102 @@ Hint Resolve grs.
       | _, _ => false
       end.
     
-                
 
+
+
+    
     Fixpoint beq (m1 m2: t A) : bool :=
       match m1, m2 with
       | nil, nil => true
-      | _, nil => bempty m1
-      | nil, _ => bempty m2
+      | _, nil => false
+      | nil, _ => false
       | hd::tl, hd1::tl1 =>  beq_single hd hd1 && beq tl tl1                 
       end.
-    
-    
 
+
+    Lemma correct_eq : forall a b, beq a b = true <-> a = b.
+    Proof. intros; split; intros. induction a, b; simpl in *; eauto. inversion H. inversion H. simpl in *.
+           destruct a, p. simpl in *. destruct o, o0. simpl in *. assert (beqA a a1 = true). destruct ( beqA a a1). eauto. destruct (beq a0 b), (elt_eq e e0); subst; simpl in *. inversion H. inversion H. inversion H. inversion H. unfold beqA in H0.
+    (*
+        Lemma bempty_correct:
+      forall m, bempty m = true <-> (forall x, get x m = None).
+Proof.
+      induction m; simpl.
+      split; intros; eauto.
+
+      split; intros. destruct a. simpl in *. destruct o. simpl in *. inversion H. simpl in *. destruct (elt_eq e x). subst. eauto. eapply IHm. eauto.
+
+
+
+
+      eapply andb_true_intro; split.  admit.
+
+
+
+
+
+      destruct a. eapply IHm. destruct o. simpl in *. intros. specialize (
+
+ 
+
+      destruct ; split; intros.
+      congruence.
+      generalize (H xH); simpl; congruence.
+      destruct (andb_prop _ _ H). rewrite IHm1 in H0. rewrite IHm2 in H1.
+      destruct x; simpl; auto.
+      apply andb_true_intro; split.
+      apply IHm1. intros; apply (H (xO x)).
+      apply IHm2. intros; apply (H (xI x)).
+    Qed.*)
+
+
+
+
+
+           
+    
     Lemma beq_correct: forall m1 m2, beq m1 m2 = true <-> (forall (x: elt),
                                                               match get x m1, get x m2 with
                                                                            | None, None => True
                                                                            | Some y1, Some y2 => beqA y1 y2 = true
                                                                            | _, _ => False
                                                                                        end).
-Proof. Admitted.
+    Proof. induction m1; intros.
+           +simpl. split; intros.
+           -induction m2. simpl in *. eauto.
+           -simpl in *. destruct a. simpl in *. destruct o. simpl in *. inversion H. simpl in *. destruct (elt_eq e x). subst. eauto. eapply IHm2. induction m2. simpl in *. eauto. simpl in *. destruct a. simpl in *. eapply H.
+           -induction m2. simpl in *. eauto. simpl in *. destruct a. simpl in *. eapply andb_true_intro. split.destruct o. simpl in *. specialize (H e). destruct ( elt_eq e e). inversion H. contradiction n; eauto. simpl in *. eauto. destruct o. simpl in *.
+
+
+
+
+      induction m1. intros.
+           -simpl in *. rewrite bempty_correct.
+
+
+
+      induction m1; intros.
+    - simpl. rewrite bempty_correct. split; intros.
+      rewrite gleaf. rewrite H. auto.
+      generalize (H x). rewrite gleaf. destruct (get x m2); tauto.
+    - destruct m2.
+      + unfold beq. rewrite bempty_correct. split; intros.
+        rewrite H. rewrite gleaf. auto.
+        generalize (H x). rewrite gleaf. destruct (get x (Node m1_1 o m1_2)); tauto.
+      + simpl. split; intros.
+        * destruct (andb_prop _ _ H). destruct (andb_prop _ _ H0).
+          rewrite IHm1_1 in H3. rewrite IHm1_2 in H1.
+          destruct x; simpl. apply H1. apply H3.
+          destruct o; destruct o0; auto || congruence.
+        * apply andb_true_intro. split. apply andb_true_intro. split.
+          generalize (H xH); simpl. destruct o; destruct o0; tauto.
+          apply IHm1_1. intros; apply (H (xO x)).
+          apply IHm1_2. intros; apply (H (xI x)).
+    Qed.
+
+
+
+    Admitted.*)
   End BOOLEAN_EQUALITY.
 
 
@@ -201,146 +272,30 @@ Print t.
     Variable f: option A -> option B -> option C.
     Hypothesis f_none_none: f None None = None.
 
-Print t.
-
-Print tree.
-
-  Fixpoint xcombine_l (m : t A) {struct m} : t C :=
-    match m with
-    | nil => nil
-               | (key, val) :: tl => (key, (f val None)) :: xcombine_l tl
-    (*  | Leaf => Leaf
-      | Node l o r => Node' (xcombine_l l) (f o None) (xcombine_l r)*)
+    Fixpoint combine_r (l : t B) :=
+      match l with
+      | nil => nil
+      | (key, val) :: tl => (key, f None val) :: combine_r tl
       end.
+    
 
-
-  Lemma xgcombine_l :
-          forall m i,
-          get i (xcombine_l m) = f (get i m) None.
-Proof.
-      induction m; intros; simpl; symmetry; eauto. destruct a. simpl in *. remember ( elt_eq e i). destruct s. simpl in *. eauto. symmetry. eauto. Qed.
-
-  Fixpoint xcombine_r (m : t B) {struct m} : t C :=
-    match m with
-    | nil => nil
-    | (key, val) :: tl => (key, (f None val)) :: xcombine_r tl
-      end.
-
-
-  Lemma xgcombine_r :
-          forall m i,
-          get i (xcombine_r m) = f None (get i m).
-Proof.
-      induction m; intros; simpl; symmetry; eauto. destruct a. simpl in *. remember ( elt_eq e i). destruct s. simpl in *. eauto. symmetry. eauto. Qed.
-
-
-
-Fixpoint combine (l1: t A) (l2: t B) :=
-  match l1 with
-  | nil => xcombine_r l2
-  | (a, b) :: tl => match get a l2 with
-                       | None => (a, f b None) :: combine tl (remove a l2)
-                       | Some res => (a, f b (Some res)) :: combine tl (remove a l2)
-                       end
-                         
-                       
+Fixpoint combine (p: t A) (p1: t B) :=
+  match p with
+  | nil => combine_r p1
+  | (key, val) :: tl => (key, f val (get key p1)) :: combine tl p1
   end.
 
 
 
 Theorem gcombine:
-      forall m1 m2 i,
-      get i (combine m1 m2) = f (get i m1) (get i m2).
-Proof. 
- Admitted.
-
+      forall p p1 i,
+      get i (combine p p1) = f (get i p) (get i p1).
+Proof. induction p; intros; simpl in *.
+       +induction p1; simpl in *. symmetry; eauto. destruct a. simpl in *. destruct ( elt_eq e i); simpl in *; eauto.
+       +destruct a. simpl in *. destruct (elt_eq e i); subst; eauto. Qed.
 
 
 End COMBINE.
-     
-
-  Fixpoint elements A (m : t A) : (list (pc * A)) :=
-    match m with
-    | nil => nil
-    | (key, Some item) :: tl => (key, item) :: elements tl
-    | _ :: tl => elements tl
-    end.
-  
-                                                    
-  Theorem elements_correct: forall (A: Type) (m: t A) (i: pc) (v: A),
-      get i m = Some v -> In (i, v) (elements m).
-  Proof. induction m. simpl in *. intros. inversion H.
-         simpl in *. destruct a. simpl in *. intros. destruct (elt_eq e i). subst. simpl in *. left. auto. simpl in *. destruct o. simpl in *. subst. right. apply IHm. auto. apply IHm. apply H. Qed.
-  
-
-  Theorem elements_complete:
-    forall (A: Type) (m: t A) (i: pc) (v: A),
-      In (i, v) (elements m) -> get i m = Some v.
-  Proof. induction m. intros. simpl in *. inversion H. intros. simpl in *.   destruct a.
-destruct ( elt_eq e i).
-
-
-
-  Admitted.
-
-
-
-  Definition xkeys (A: Type) (m: t A) (i: pc) :=
-    List.map fst m.
-
-Print list_norepet.
-  Lemma xelements_keys_norepet:
-    forall (A: Type) (m: t A) (i: pc),
-      list_norepet (xkeys m i).
-Proof. intros. induction m. simpl in *. constructor. simpl in *. destruct a. simpl in *. constructor. simpl in *. Admitted.
-
-
-Theorem elements_keys_norepet:
-  forall (A: Type) (m: t A),
-    list_norepet (List.map fst (elements m)). Proof. Admitted.
-
-
-
-Theorem elements_extensional:
-  forall (A: Type) (m n: t A),
-    (forall i, get i m = get i n) ->
-    elements m = elements n.
-Proof. Admitted.
-
-Theorem elements_remove:
-  forall (A: Type) i v (m: t A),
-    get i m = Some v ->
-    exists l1 l2, elements m = l1 ++ (i, v) :: l2 /\ elements (remove i m) = l1 ++ l2.
-Proof. intros. Admitted.
-
-
-Fixpoint fold1 (A B: Type) (f: B -> A -> B) (m: t A) (v: B) : B :=
-  match m with
-  | nil => v
-  | (key, Some item) :: tl => fold1 f tl (f v item)
-  | (key, None) :: tl => fold1 f tl v
-  end.
-
-Fixpoint fold (A B: Type) (f: B -> pc -> A -> B) (m: t A) (v: B) : B :=
-  match m with
-  | nil => v
-  | (key, Some item) :: tl => fold f tl (f v key item)
-  | (key, None) :: tl => fold f tl v
-  end.
-
-
-Theorem fold_spec:
-  forall (A B: Type) (f: B -> pc -> A -> B) (v: B) (m: t A),
-    fold f m v =
-    List.fold_left (fun a p => f a (fst p) (snd p)) (elements m) v.
-Proof. induction m. simpl in *. auto.
-       simpl in *. destruct a. simpl in *. destruct o. simpl in *. eauto. Admitted.
-
-Theorem fold1_spec:
-  forall (A B: Type) (f: B -> A -> B) (v: B) (m: t A),
-    fold1 f m v =
-    List.fold_left (fun a p => f a (snd p)) (elements m) v.
-  Proof. Admitted. 
 End PCTree.
 
   
@@ -429,6 +384,21 @@ Notation "a !! b" := (PCMap.get b a) (at level 1).
 
 
 Definition loc_id_eq (a b:local_id) := decide (a = b).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 Module lidTree <: TREE.
   Definition elt := local_id.
@@ -620,146 +590,36 @@ Print t.
     Variable f: option A -> option B -> option C.
     Hypothesis f_none_none: f None None = None.
 
-Print t.
 
-Print tree.
 
-  Fixpoint xcombine_l (m : t A) {struct m} : t C :=
-    match m with
-    | nil => nil
-               | (key, val) :: tl => (key, (f val None)) :: xcombine_l tl
-    (*  | Leaf => Leaf
-      | Node l o r => Node' (xcombine_l l) (f o None) (xcombine_l r)*)
+
+
+
+    Fixpoint combine_r (l : t B) :=
+      match l with
+      | nil => nil
+      | (key, val) :: tl => (key, f None val) :: combine_r tl
       end.
+    
 
-
-  Lemma xgcombine_l :
-          forall m i,
-          get i (xcombine_l m) = f (get i m) None.
-Proof.
-      induction m; intros; simpl; symmetry; eauto. destruct a. simpl in *. remember ( elt_eq e i). destruct s. simpl in *. eauto. symmetry. eauto. Qed.
-
-  Fixpoint xcombine_r (m : t B) {struct m} : t C :=
-    match m with
-    | nil => nil
-    | (key, val) :: tl => (key, (f None val)) :: xcombine_r tl
-      end.
-
-
-  Lemma xgcombine_r :
-          forall m i,
-          get i (xcombine_r m) = f None (get i m).
-Proof.
-      induction m; intros; simpl; symmetry; eauto. destruct a. simpl in *. remember ( elt_eq e i). destruct s. simpl in *. eauto. symmetry. eauto. Qed.
-
-
-
-Fixpoint combine (l1: t A) (l2: t B) :=
-  match l1 with
-  | nil => xcombine_r l2
-  | (a, b) :: tl => match get a l2 with
-                       | None => (a, f b None) :: combine tl (remove a l2)
-                       | Some res => (a, f b (Some res)) :: combine tl (remove a l2)
-                       end
-                         
-                       
+Fixpoint combine (p: t A) (p1: t B) :=
+  match p with
+  | nil => combine_r p1
+  | (key, val) :: tl => (key, f val (get key p1)) :: combine tl p1
   end.
 
 
 
 Theorem gcombine:
-      forall m1 m2 i,
-      get i (combine m1 m2) = f (get i m1) (get i m2).
-Proof. 
- Admitted.
+      forall p p1 i,
+      get i (combine p p1) = f (get i p) (get i p1).
+Proof. induction p; intros; simpl in *.
+       +induction p1; simpl in *. symmetry; eauto. destruct a. simpl in *. destruct ( elt_eq e i); simpl in *; eauto.
+       +destruct a. simpl in *. destruct (elt_eq e i); subst; eauto. Qed.
 
 
 
 End COMBINE.
-     
-
-  Fixpoint elements A (m : t A) : (list (local_id * A)) :=
-    match m with
-    | nil => nil
-    | (key, Some item) :: tl => (key, item) :: elements tl
-    | _ :: tl => elements tl
-    end.
-  
-                                                    
-  Theorem elements_correct: forall (A: Type) (m: t A) (i: local_id) (v: A),
-      get i m = Some v -> In (i, v) (elements m).
-  Proof. induction m. simpl in *. intros. inversion H.
-         simpl in *. destruct a. simpl in *. intros. destruct (elt_eq e i). subst. simpl in *. left. auto. simpl in *. destruct o. simpl in *. subst. right. apply IHm. auto. apply IHm. apply H. Qed.
-  
-
-  Theorem elements_complete:
-    forall (A: Type) (m: t A) (i: local_id) (v: A),
-      In (i, v) (elements m) -> get i m = Some v.
-  Proof. induction m. intros. simpl in *. inversion H. intros. simpl in *.   destruct a.
-destruct ( elt_eq e i).
-
-
-
-  Admitted.
-
-
-
-  Definition xkeys (A: Type) (m: t A) (i: local_id) :=
-    List.map fst m.
-
-Print list_norepet.
-  Lemma xelements_keys_norepet:
-    forall (A: Type) (m: t A) (i: local_id),
-      list_norepet (xkeys m i).
-Proof. intros. induction m. simpl in *. constructor. simpl in *. destruct a. simpl in *. constructor. simpl in *. Admitted.
-
-
-Theorem elements_keys_norepet:
-  forall (A: Type) (m: t A),
-    list_norepet (List.map fst (elements m)). Proof. Admitted.
-
-
-
-Theorem elements_extensional:
-  forall (A: Type) (m n: t A),
-    (forall i, get i m = get i n) ->
-    elements m = elements n.
-Proof. Admitted.
-
-Theorem elements_remove:
-  forall (A: Type) i v (m: t A),
-    get i m = Some v ->
-    exists l1 l2, elements m = l1 ++ (i, v) :: l2 /\ elements (remove i m) = l1 ++ l2.
-Proof. intros. Admitted.
-
-
-Fixpoint fold1 (A B: Type) (f: B -> A -> B) (m: t A) (v: B) : B :=
-  match m with
-  | nil => v
-  | (key, Some item) :: tl => fold1 f tl (f v item)
-  | (key, None) :: tl => fold1 f tl v
-  end.
-
-Fixpoint fold (A B: Type) (f: B -> local_id -> A -> B) (m: t A) (v: B) : B :=
-  match m with
-  | nil => v
-  | (key, Some item) :: tl => fold f tl (f v key item)
-  | (key, None) :: tl => fold f tl v
-  end.
-
-
-Theorem fold_spec:
-  forall (A B: Type) (f: B -> local_id -> A -> B) (v: B) (m: t A),
-    fold f m v =
-    List.fold_left (fun a p => f a (fst p) (snd p)) (elements m) v.
-Proof. induction m. simpl in *. auto.
-       simpl in *. destruct a. simpl in *. destruct o. simpl in *. eauto. Admitted.
-
-Theorem fold1_spec:
-  forall (A B: Type) (f: B -> A -> B) (v: B) (m: t A),
-    fold1 f m v =
-    List.fold_left (fun a p => f a (snd p)) (elements m) v.
-  Proof. Admitted.
 End lidTree.
 
   
@@ -827,8 +687,9 @@ Module lidMap <: MAP.
   Theorem set2:
     forall (A: Type) (i: elt) (x y: A) (m: t A),
       set i y (set i x m) = set i y m.
-  Proof.
-    intros. unfold set. simpl in *. decEq. Admitted.
+  Proof. induction m; simpl in *. unfold set. simpl in *. induction b. simpl in *. destruct (lidTree.elt_eq i i). eauto. contradiction n; eauto.
+         simpl in *. destruct a0. simpl in *. destruct (lidTree.elt_eq e i). subst. simpl in *. destruct ( lidTree.elt_eq i i ). eauto. contradiction n. eauto.
+         simpl in *. destruct (lidTree.elt_eq e i). subst. contradiction n; eauto. inversion IHb. rewrite H0. eauto. Qed.
 End lidMap.
   
 

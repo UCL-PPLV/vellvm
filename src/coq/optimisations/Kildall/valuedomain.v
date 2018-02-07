@@ -28,10 +28,6 @@ Inductive aval : Type :=
 . 
 
 
-
-Print eqType.
-Locate eqType.
-Print SEMILATTICE_WITH_TOP.
 Module AVal <: SEMILATTICE_WITH_TOP.
 
   Definition t := aval.
@@ -101,7 +97,6 @@ Lemma eq_trans: forall x y z, eq x y -> eq y z -> eq x z.
     Proof. intros. destruct x; simpl in *; eauto. Qed.
     
 
-Print aval.
     Definition lub (a b: aval) :=
       match a, b with
       | vbot, _ => b
@@ -131,7 +126,12 @@ unfold decide. destruct (eq_dvalue n n0); simpl in *; subst; eauto. unfold decid
 Proof. destruct x; simpl in *; eauto. Qed.
        
 End AVal.
+Print lidMap.
+Print LPMap.
 
+
+
+Print lidPMap.
 Module AE := lidPMap(AVal).
 
 Definition aenv := AE.t.
@@ -158,8 +158,10 @@ destruct x. simpl in *. eauto. simpl in *. apply AE.eq_refl. Qed.
   Proof. intros.  destruct x, y; simpl in *; eauto. apply AE.eq_sym in H. auto. Qed.
 
   Lemma eq_trans: forall x y z, eq x y -> eq y z -> eq x z.
-Proof.
-Admitted.
+  Proof.
+        destruct x, y, z; simpl; try tauto. intros.
+    eapply AE.eq_trans; eauto.
+Qed.
 
 
 Definition beq (x y: t) : bool :=
@@ -170,7 +172,10 @@ Definition beq (x y: t) : bool :=
     end.
 
   Lemma beq_correct: forall x y, beq x y = true -> eq x y.
-Proof. Admitted.
+Proof.    destruct x, y; simpl; intros.
+    auto. congruence. congruence. eapply AE.beq_correct. eauto. Qed.
+
+
 
   Definition ge (x y: t) : Prop :=
     match x, y with
@@ -180,18 +185,20 @@ Proof. Admitted.
     end.
 
   Lemma ge_refl: forall x y, eq x y -> ge x y.
-Proof.
-Admitted.
+  Proof. intros. destruct x, y; eauto. unfold eq in *. inversion H.
+         unfold eq in *. simpl in *. apply AE.ge_refl. auto. Qed.
 
 Lemma ge_trans: forall x y z, ge x y -> ge y z -> ge x z.
 Proof.
-Admitted.
+      destruct x, y, z; simpl; try tauto. intros.
+    eapply AE.ge_trans; eauto.
+  Qed.
+
 
 
   Definition bot : t := Bot.
   Lemma ge_bot: forall x, ge x bot.
-Proof.
-Admitted.
+Proof. intros. destruct x; simpl; eauto. Qed.
 
 
 Definition lub (x y: t) : t :=
@@ -202,13 +209,23 @@ Definition lub (x y: t) : t :=
     end.
 
   Lemma ge_lub_left: forall x y, ge (lub x y) x.
-Proof.
-Admitted.
+  Proof.
+        destruct x, y.
+    apply ge_refl; apply eq_refl.
+    simpl. auto.
+    apply ge_refl; apply eq_refl.
+    simpl. eapply AE.ge_lub_left.
+Qed.
 
 
 Lemma ge_lub_right: forall x y, ge (lub x y) y.
 Proof.
-Admitted.
+    destruct x, y.
+    apply ge_refl; apply eq_refl.
+    apply ge_refl; apply eq_refl.
+    simpl. auto.
+    simpl. apply AE.ge_lub_right.
+  Qed.
 
 End VA.
 
@@ -264,6 +281,8 @@ destruct ( AE.get p ae2), (AE.get p ae1); try constructor; eauto; try inversion 
 
 Lemma vmatch_false : forall e p, vmatch (lookup_env_aenv e p) AVal.bot -> False.
 Proof. intros. inversion H. Qed.
+
+
 
 
 Lemma ematch_update:

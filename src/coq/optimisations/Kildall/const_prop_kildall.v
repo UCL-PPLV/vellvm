@@ -63,13 +63,34 @@ Definition get_value (a:aenv) (i:ident) :=
                      
   end.
 
+(*              | VALUE_Ident _ => vtop
+              | VALUE_Integer i =>  ( (avalue (DV (VALUE_Integer i))))
+              | VALUE_Float i => ( (avalue (DV (VALUE_Float i))))
+              | VALUE_Bool i =>  ( (avalue (DV (VALUE_Bool i))))
+              | VALUE_Null => ( (avalue (DV (VALUE_Null))))
+              | VALUE_Zero_initializer => ((avalue (DV (VALUE_Zero_initializer))))
+              | VALUE_Cstring a =>  ((avalue (DV (VALUE_Cstring a))))
+              | VALUE_None => ((avalue (DV (VALUE_None))))
+              | VALUE_Undef => ((avalue (DV (VALUE_Undef))))
+ *)
+
+
 
 Definition substitute_value (a:aenv) (o:Ollvm_ast.value) :=
   match o with
   | SV (VALUE_Ident (ID_Local ident)) => match AE.get ident a with
-                                        |  (avalue (DV (VALUE_Integer i))) => SV ((VALUE_Integer i))
-                                        | _ => SV (VALUE_Ident (ID_Local ident))
-                                        end
+                                         |  (avalue (DV (VALUE_Integer i))) => SV ((VALUE_Integer i))                                                       
+                                         |  (avalue (DV (VALUE_Float i))) => SV ((VALUE_Float i))
+                                         |  (avalue (DV (VALUE_Bool i))) => SV ((VALUE_Bool i))
+                                         |  (avalue (DV (VALUE_Null))) => SV ((VALUE_Null))
+                                         |  (avalue (DV (VALUE_Zero_initializer))) => SV ((VALUE_Zero_initializer))
+                                         |  (avalue (DV (VALUE_Cstring i))) => SV ((VALUE_Cstring i))
+                                         |  (avalue (DV (VALUE_None))) => SV ((VALUE_None))
+                                         |  (avalue (DV (VALUE_Undef))) => SV ((VALUE_Undef))
+
+                                         | _ => SV (VALUE_Ident (ID_Local ident))
+
+                                         end
   | _ => o
   end.
 
@@ -77,12 +98,18 @@ Definition substitute_value (a:aenv) (o:Ollvm_ast.value) :=
 Print modul_opt.
 Print analyse.
 
-
+(*
 Definition optimise_val (a:aenv) (o:Ollvm_ast.value)  (r:raw_id) :=
   match o with
   | SV (VALUE_Ident (ID_Local ident)) =>  (get_value a (ID_Local ident))
-  | SV (OP_IBinop ibinop (TYPE_I 32)  (SV (VALUE_Ident (ID_Local ident)))  (SV (VALUE_Ident (ID_Local ident1)))) =>
-  (SV (OP_IBinop ibinop (TYPE_I 32)  (substitute_value a ( (SV (VALUE_Ident (ID_Local ident))))) (substitute_value a ( (SV (VALUE_Ident (ID_Local ident1)))))))
+  | SV (OP_IBinop ibinop (TYPE_I 1)  a a1) =>
+    (SV (OP_IBinop ibinop (TYPE_I 32) a a1) (substitute_value a ( (SV (VALUE_Ident (ID_Local ident))))) (substitute_value a ( (SV (VALUE_Ident (ID_Local ident1)))))))
+
+  | SV (OP_IBinop ibinop (TYPE_I 32)  a a1) =>
+    (SV (OP_IBinop ibinop (TYPE_I 32)  (substitute_value a ( (SV (VALUE_Ident (ID_Local ident))))) (substitute_value a ( (SV (VALUE_Ident (ID_Local ident1)))))))
+  | SV (OP_IBinop ibinop (TYPE_I 64)  a a1) =>
+  (SV (OP_IBinop ibinop (TYPE_I 64)  (substitute_value a ( (SV (VALUE_Ident (ID_Local ident))))) (substitute_value a ( (SV (VALUE_Ident (ID_Local ident1)))))))
+
   | rest => rest 
   end.
 
@@ -101,7 +128,14 @@ Proof. intros.
        destr_eq (AE.get id0 a).
        +simpl. destr (lookup_env e id0). destr_eq (AE.get id1 a). eapply ematch_get in Heqt0; eauto. rewrite Heqt0. destr n; try destr e0; simpl in *; rewrite Heqt0; eauto. eapply ematch_get in Heqt; eauto. rewrite Heqt. simpl in *.
 
-        destr_eq (AE.get id1 a). simpl in *. destr n; simpl in *. destr e0; simpl in *; rewrite Heqt; eauto. rewrite Heqt. simpl in *. eauto. rewrite Heqt. eauto. rewrite Heqt. eauto. rewrite Heqt. eauto. rewrite Heqt. eauto. rewrite Heqt. eauto. simpl in *. eapply ematch_get in Heqt0; eauto. rewrite Heqt0. simpl in *; destr n; destr n0; try destr e0; simpl in *; try rewrite Heqt0; try rewrite Heqt; try destr e1; simpl in *; try rewrite Heqt0; simpl in *; eauto. simpl in *. destr (lookup_env e id1). destr n; simpl in *; eauto; try destr e0; simpl in *; try rewrite Heqt; eauto. destr n; try destr e0; simpl in *; try rewrite Heqt; eauto. simpl in *. destr_eq (lookup_env e id0). destr_eq (AE.get id1 a). eapply ematch_get in Heqt0; eauto. rewrite Heqt0. destr n. destr e0; simpl in *; rewrite Heqt0; simpl in *; eauto. simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto. Qed.
+        destr_eq (AE.get id1 a). simpl in *. destr n; simpl in *. destr e0; simpl in *; rewrite Heqt; eauto. rewrite Heqt. simpl in *. eauto. rewrite Heqt. eauto. rewrite Heqt. eauto. rewrite Heqt. eauto. rewrite Heqt. eauto. rewrite Heqt. eauto. simpl in *. eapply ematch_get in Heqt0; eauto. rewrite Heqt0. simpl in *; destr n; destr n0; try destr e0; simpl in *; try rewrite Heqt0; try rewrite Heqt; try destr e1; simpl in *; try rewrite Heqt0; simpl in *; eauto. simpl in *. destr (lookup_env e id1). destr n; simpl in *; eauto; try destr e0; simpl in *; try rewrite Heqt; eauto. destr n; try destr e0; simpl in *; try rewrite Heqt; eauto. simpl in *. destr_eq (lookup_env e id0). destr_eq (AE.get id1 a). eapply ematch_get in Heqt0; eauto. rewrite Heqt0. destr n. destr e0; simpl in *; rewrite Heqt0; simpl in *; eauto. simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.
+
+
+
+
+
+
+Qed.
 
 
 
@@ -131,4 +165,4 @@ Proof. intros.  apply congruence_correct1; eauto.
        
        unfold correct_instr1; intros; eauto.
        unfold optimise_instr; simpl in *. inv sstate0; simpl in *. unfold get_point. rewrite AN.
-       destr_eq id. destr_eq instr; subst. eapply  val_correct in EM. unfold exec_code1; simpl in *; unfold individual_step; simpl in *. rewrite -> EM. eauto. Qed.
+       destr_eq id. destr_eq instr; subst. eapply  val_correct in EM. unfold exec_code1; simpl in *; unfold individual_step; simpl in *. rewrite -> EM. eauto. Qed.*)

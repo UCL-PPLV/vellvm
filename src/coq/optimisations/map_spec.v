@@ -100,38 +100,4 @@ Module Type TREE.
     f None None = None ->
     forall (m1: t A) (m2: t B) (i: elt),
     get i (combine f m1 m2) = f (get i m1) (get i m2).
-
-  Parameter elements:
-    forall (A: Type), t A -> list (elt * A).
-  Axiom elements_correct:
-    forall (A: Type) (m: t A) (i: elt) (v: A),
-    get i m = Some v -> In (i, v) (elements m).
-  Axiom elements_complete:
-    forall (A: Type) (m: t A) (i: elt) (v: A),
-    In (i, v) (elements m) -> get i m = Some v.
-  Axiom elements_keys_norepet:
-    forall (A: Type) (m: t A),
-    list_norepet (List.map (@fst elt A) (elements m)).
-  Axiom elements_extensional:
-    forall (A: Type) (m n: t A),
-    (forall i, get i m = get i n) ->
-    elements m = elements n.
-  Axiom elements_remove:
-    forall (A: Type) i v (m: t A),
-    get i m = Some v ->
-    exists l1 l2, elements m = l1 ++ (i,v) :: l2 /\ elements (remove i m) = l1 ++ l2.
-
-  Parameter fold:
-    forall (A B: Type), (B -> elt -> A -> B) -> t A -> B -> B.
-  Axiom fold_spec:
-    forall (A B: Type) (f: B -> elt -> A -> B) (v: B) (m: t A),
-    fold f m v =
-    List.fold_left (fun a p => f a (fst p) (snd p)) (elements m) v.
-
-  Parameter fold1:
-    forall (A B: Type), (B -> A -> B) -> t A -> B -> B.
-  Axiom fold1_spec:
-    forall (A B: Type) (f: B -> A -> B) (v: B) (m: t A),
-    fold1 f m v =
-    List.fold_left (fun a p => f a (snd p)) (elements m) v.
 End TREE.
