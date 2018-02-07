@@ -3,8 +3,8 @@ Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellv
 Require Import Vellvm.optimisations.transform.
 Require Import Vellvm.optimisations.paco_util.
 Require Import Vellvm.optimisations.step_trace.
-Require Import Vellvm.optimisations.Kildall.static_eval_valuedomain.
-Require Import Vellvm.optimisations.Kildall.static_eval_valueanalysis.
+Require Import Vellvm.optimisations.Kildall.valuedomain.
+Require Import Vellvm.optimisations.Kildall.valueanalysis.
 
 Require Import Vellvm.optimisations.SSA_semantics.
 

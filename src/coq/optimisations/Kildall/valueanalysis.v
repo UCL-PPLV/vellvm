@@ -8,8 +8,9 @@ Require Import Vellvm.optimisations.transform.
 Require Import Vellvm.optimisations.paco_util.
 Require Import Vellvm.optimisations.step_trace.
 Require Import Vellvm.optimisations.EqNat.
-Require Import Vellvm.optimisations.Kildall.static_eval_valuedomain.
+Require Import Vellvm.optimisations.Kildall.valuedomain.
 Require Import Vellvm.optimisations.Kildall.kildall.
+Require Import Vellvm.optimisations.Kildall.static_eval.
 
 Require Import Vellvm.DecidableEquality.
 Require Import Vellvm.DecidableProp.
@@ -56,7 +57,6 @@ Definition cfg_to_pc fn (c:cfg) := flatten (map (block_to_pc fn) (blks c)).
 Definition def_cfg_to_pc (d:definition cfg) := cfg_to_pc (dc_name (df_prototype d)) (df_instrs d).
 
 
-Print find_block.
 
 
 
@@ -144,18 +144,24 @@ Definition get_successors (m:mcfg) (p:pc) :=
 
 
 Print instr. Print Expr. Print aval.
-       
+
+Print eval_aenv_expr.
+
 
 Definition transfer' (m:mcfg) (p:pc) (a:aenv) : VA.t :=
   match fetch m p with
   | Some (Term (TERM_Br _ _ _)) => VA.State (AE.Top_except nil)
   | Some (Term (TERM_Br_1 _)) => VA.State (AE.Top_except nil)
-  | Some (CFG.Step (INSTR_Op (SV (VALUE_Integer i)))) => match (pt p) with
-                                                         | IId id => VA.State (AE.set id (avalue (DV (VALUE_Integer i))) a)
-                                                         | _ => VA.State a
-                                                         end
-                                                           
-    
+  | Some (CFG.Step (INSTR_Op (SV o))) => match (pt p) with
+                                         | IId id => VA.State (AE.set id (eval_aenv_expr a o) a)
+                                         | _ => VA.State a
+                                         end
+  
+
+
+
+
+
   | Some (CFG.Step (INSTR_Call _ _)) => VA.State (AE.Top_except nil)
   | Some _ => match (pt p) with
               | IId id => VA.State (AE.set id (vtop) a)
@@ -195,7 +201,7 @@ Definition analyse (m:mcfg) :=
   end.
 
 
-
+(*
 Definition lookup_env_aenv (e:env) (id:raw_id) : aval :=
   match lookup_env e id with
   | None => vbot
@@ -269,7 +275,7 @@ destruct (AstLib.RawID.eq_dec p r), (loc_id_eq p r); subst; eauto; try contradic
 Qed.
 
 
-
+*)
  
 Inductive sound_stack : mcfg -> stack -> Prop :=
 | nil_stack : forall p, sound_stack p nil
@@ -370,15 +376,6 @@ Proof. intros. unfold get_successors. simpl in *. rewrite Heqo. rewrite Heqo0.
        destruct f. simpl in *. eauto. simpl in *. eauto. simpl in *.
        eauto. Qed.
 Hint Resolve unfold_instr.
-
-Lemma ematch_add : forall id e ae v 
-(EM : ematch e ae),
-              ematch ((id, v) :: e) (AE.set id vtop ae).
-Proof. intros. eapply ematch_update; eauto; try constructor. Qed.
-Hint Resolve ematch_add.
-
-Lemma ematch_top : forall e0, ematch e0 (AE.Top_except [::]).
-Proof. intros. constructor. Qed. Hint Resolve ematch_top.
 
 
 Lemma transfer_add :

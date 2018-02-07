@@ -15,8 +15,8 @@ From mathcomp.ssreflect
 Require Import ssreflect ssrbool seq eqtype ssrnat.
 Require Import Vellvm.optimisations.SSA_semantics.
 Require Import Vellvm.optimisations.maps.
-Require Import Vellvm.optimisations.Kildall.static_eval_valueanalysis.
-Require Import Vellvm.optimisations.Kildall.static_eval_valuedomain.
+Require Import Vellvm.optimisations.Kildall.valueanalysis.
+Require Import Vellvm.optimisations.Kildall.valuedomain.
 Require Import Vellvm.optimisations.Kildall.congruence_proof_kildall.
 Require Import Vellvm.optimisations.Kildall.congruence_definition_kildall.
 

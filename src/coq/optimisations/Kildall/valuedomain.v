@@ -211,3 +211,92 @@ Proof.
 Admitted.
 
 End VA.
+
+
+
+
+
+Definition lookup_env_aenv (e:env) (id:raw_id) : aval :=
+  match lookup_env e id with
+  | None => vbot
+  | Some a => avalue a
+  end.
+
+
+
+(*env - aenv*)
+Inductive vmatch : aval -> aval -> Prop :=
+| vtop_match : forall dval, vmatch dval vtop
+| vval_match : forall dval dval1, dval = dval1 -> vmatch (avalue dval1) (avalue dval).
+
+
+
+
+Definition ematch (e:env) (a:aenv) := forall p, vmatch (lookup_env_aenv e p) (AE.get p a).
+
+Inductive vge: aval -> aval -> Prop :=
+| vge_bot : forall v, vge v vbot
+| vge_val : forall v v1, v = v1 -> vge (avalue v) (avalue v1)
+| vge_top : forall v, vge vtop v.
+
+
+
+
+
+Lemma vmatch_ge:
+  forall v x y, vge x y -> vmatch v y -> vmatch v x.
+Proof.
+  induction 1; intros V. inversion V. subst. eauto. constructor. Qed.
+
+
+
+Lemma ematch_ge:
+  forall  e ae1 ae2,
+  ematch e ae1 -> AE.ge ae2 ae1 -> ematch e ae2.
+Proof. intros. unfold ematch in *. intros. unfold AE.ge in *. specialize (H p).
+       specialize (H0 p). unfold AVal.ge in *. simpl in *. destruct ((lookup_env_aenv e p)); eauto. eapply vmatch_ge; eauto. destruct ( AE.get p ae2); simpl in *; eauto. destruct ( AE.get p ae1); eauto. apply vge_bot. inversion H0. inversion H0. destruct (AE.get p ae1). constructor. constructor. destruct (decide (n = n0)). subst; eauto. simpl in *. inversion H0. inversion H0.
+destruct (AE.get p ae1). constructor. constructor. constructor.
+destruct (AE.get p ae1), ( AE.get p ae2); eauto; inversion H; inversion H0; subst. constructor.
+destruct (decide (n1 = n)). subst. eauto. simpl in *. inversion H5. constructor. 
+destruct ( AE.get p ae2), (AE.get p ae1); try constructor; eauto; try inversion H0; inversion H. Qed.
+
+
+
+Lemma vmatch_false : forall e p, vmatch (lookup_env_aenv e p) AVal.bot -> False.
+Proof. intros. inversion H. Qed.
+
+
+Lemma ematch_update:
+  forall e ae v av r,
+  ematch e ae -> vmatch (avalue v) av -> ematch (add_env r v e) (AE.set r av ae).
+Proof.
+  intros. red. intros. remember ( (lookup_env_aenv (add_env r v e) p)).
+ assert  (ae <> AE.Bot -> ~ (AVal.beq av AVal.bot) = true ->
+vmatch a ((if loc_id_eq p r then av else AE.get p ae)) -> vmatch a (AE.get p (AE.set r av ae))).
+ intros. unfold is_left in. simpl in *. unfold AE.get, AE.set in *. unfold is_left in *. simpl in *. destruct ae. congruence. destruct ( AVal.beq av AVal.bot). contradiction H2; eauto.
+ destruct (AVal.beq av AVal.top) eqn:?. simpl in *.
+ rewrite lidTree.grspec. unfold lidTree.elt_eq. 
+destruct ( loc_id_eq p r). constructor. eauto.
+rewrite lidTree.gsspec. unfold lidTree.elt_eq. simpl in *.
+destruct ( loc_id_eq p r). eauto. eauto.
+apply H1. unfold not. intros. subst. unfold ematch in *.
+simpl in *. specialize (H r). inversion H. simpl in *.
+unfold not. intros.  apply AVal.beq_eq in H2.
+subst. simpl in *. inversion H0.
+unfold is_left. simpl in *. subst.
+unfold lookup_env_aenv, add_env, lookup_env in *; simpl in *.
+destruct (AstLib.RawID.eq_dec p r), (loc_id_eq p r); subst; eauto; try contradiction n; eauto.
+Qed.
+
+
+
+
+Lemma ematch_add : forall id e ae v 
+(EM : ematch e ae),
+              ematch ((id, v) :: e) (AE.set id vtop ae).
+Proof. intros. eapply ematch_update; eauto; try constructor. Qed.
+Hint Resolve ematch_add.
+
+Lemma ematch_top : forall e0, ematch e0 (AE.Top_except [::]).
+Proof. intros. constructor. Qed. Hint Resolve ematch_top.
+

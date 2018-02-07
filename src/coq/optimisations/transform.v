@@ -1,7 +1,7 @@
 
 Require Import ZArith List String Omega.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util.
-Require Import Vellvm.StepSemantics.
+(*Require Import Vellvm.StepSemantics.
 Import ListNotations.
 
 Set Implicit Arguments.
@@ -40,7 +40,7 @@ mk_modul CFG.cfg m.(m_name) m.(m_target) m.(m_datalayout) m.(m_globals) m.(m_dec
 
 
 
-
+(*
 
 (*Disabling certain instructions*)
 
@@ -72,4 +72,4 @@ end.
 
 Inductive disable_state (m:CFG.mcfg) : state -> Prop :=
   | disable_state_intro : forall s p e i, disable_instr i = true -> CFG.fetch m p = Some (CFG.Step i) -> disable_state m (p, e, s).
-
+*) *)
