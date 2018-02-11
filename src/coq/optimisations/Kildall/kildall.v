@@ -5,6 +5,7 @@ Require Import Vellvm.CFG Vellvm.CFGProp Vellvm.Effects Vellvm.Memory.
 Require Import compcert.lib.Iteration.
 Require Import Vellvm.StepSemantics.
 Require Import Vellvm.optimisations.step_trace.
+Require Import Vellvm.optimisations.local_cfg.
 
 Local Unset Elimination Schemes.
 Local Unset Case Analysis Schemes.
@@ -15,11 +16,11 @@ Module Type NODE_SET.
 
   Parameter t: Type.
   Parameter empty: t.
-  Parameter add: pc -> t -> t.
-  Parameter pick: t -> option (pc * t).
-  Parameter all_nodes: mcfg -> t.
+  Parameter add: local_pc -> t -> t.
+  Parameter pick: t -> option (local_pc * t).
+  Parameter all_nodes: cfg -> t.
 
-  Parameter In: pc -> t -> Prop.
+  Parameter In: local_pc -> t -> Prop.
   Axiom empty_spec:
     forall n, ~In n empty.
   Axiom add_spec:
@@ -37,9 +38,9 @@ End NODE_SET.
 
 Print cmd.
 Section REACHABLE.
-Context (fetch: mcfg -> pc -> option cmd) (code: mcfg) (successors:  mcfg -> pc -> list pc).
+Context (fetch: cfg -> local_pc -> option cmd) (code: cfg) (successors:  cfg -> local_pc -> list local_pc).
 
-Inductive reachable: pc -> pc -> Prop :=
+Inductive reachable: local_pc -> local_pc -> Prop :=
   | reachable_refl: forall n, reachable n n
   | reachable_left: forall n1 n2 n3 i,
       fetch code n1 = Some i -> In n2 (successors code n1) -> reachable n2 n3 ->
@@ -74,23 +75,23 @@ Module Dataflow_Solver (LAT: SEMILATTICE) (NS: NODE_SET).
 
 
     Context {A: Type} (*LATTICE*)  {B: Type}. (*CODE*)
-    Variable code: mcfg. (*MCFG*)
-    Variable fetch : mcfg -> pc -> option cmd. (*MCFG -> PC -> INSTR*)
-    Variable successors:  mcfg -> pc -> list pc.
-Variable transf: mcfg -> pc -> L.t -> L.t.
+    Variable code: cfg. (*MCFG*)
+    Variable fetch : cfg -> local_pc -> option cmd. (*MCFG -> PC -> INSTR*)
+    Variable successors:  cfg -> local_pc -> list local_pc.
+Variable transf: cfg -> local_pc -> L.t -> L.t.
 
 
 Record state : Type :=
-  mkstate { aval: PCTree.t L.t; worklist: NS.t; visited: pc -> Prop }.
+  mkstate { aval: PCTree.t L.t; worklist: NS.t; visited: local_pc -> Prop }.
 
-Definition abstr_value (n: pc) (s: state) : L.t :=
+Definition abstr_value (n: local_pc) (s: state) : L.t :=
   match PCTree.get n (s.(aval)) with
   | None => L.bot
   | Some v => v
   end.
 
 
-Definition propagate_succ (s: state) (out: L.t) (n: pc) :=
+Definition propagate_succ (s: state) (out: L.t) (n: local_pc) :=
   match PCTree.get n (s.(aval)) with
   | None =>
       {| aval := PCTree.set n out s.(aval);
@@ -106,7 +107,7 @@ Definition propagate_succ (s: state) (out: L.t) (n: pc) :=
   end.
 
 
-Fixpoint propagate_succ_list (s: state) (out: L.t) (succs: list pc)
+Fixpoint propagate_succ_list (s: state) (out: L.t) (succs: list local_pc)
                              {struct succs} : state :=
   match succs with
   | nil => s
@@ -142,7 +143,7 @@ Definition fixpoint_from (start: state) : option (PCMap.t L.t) :=
 
 (**)
 
-Definition start_state (enode: pc) (eval: L.t) :=
+Definition start_state (enode: local_pc) (eval: L.t) :=
   {| aval := PCTree.set enode eval (PCTree.empty L.t);
      worklist := NS.add enode NS.empty;
      visited := fun n => n = enode |}.
@@ -159,7 +160,7 @@ Definition start_state_allnodes :=
   {| aval := PCTree.empty L.t; worklist := NS.all_nodes code; visited := fun n => exists instr, PCTree.get n code = Some instr|}.
 *)
 
-Definition fixpoint (enode: pc) (eval: L.t) :=
+Definition fixpoint (enode: local_pc) (eval: L.t) :=
   fixpoint_from (start_state enode eval).
 (*
 Definition fixpoint_allnodes := fixpoint_from start_state_allnodes.
@@ -594,3 +595,7 @@ Qed.
 End Kildall.
 
 End Dataflow_Solver.
+
+
+Require Import Vellvm.CFG.
+Print mcfg.

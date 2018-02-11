@@ -7,6 +7,7 @@ Require Import ssreflect ssrbool seq eqtype ssrnat fintype.
 Require Import Vellvm.Ollvm_ast Vellvm.CFG.
 Require Import Vellvm.Classes.
 Require Import Vellvm.AstLib.
+
 Require Import String Ascii.
 Require Import Bool.
 Require Import Equalities.
@@ -110,32 +111,3 @@ Admitted.
 
 Canonical instr_id_eqMixin := EqMixin (T:= instr_id) (op:=eqinstr_id) (@eqinstr_idP).
 Canonical instr_id_eqType := Eval hnf in EqType instr_id instr_id_eqMixin.
-
-Print instr.
-Print value.
-Print Expr.
-Print ident.
-
-Definition eqident (a b: ident) :=
-match a, b with
-  | ID_Global c, ID_Global d => eqraw_id c d
-  | ID_Local c, ID_Local d => eqraw_id c d
-  | _, _ => false
-end.
-
-
-
-
-
-
-
-
-(******VALUE*)
-
-
-
-
-
-
-Print instr.
-Print Ollvm_ast.value.

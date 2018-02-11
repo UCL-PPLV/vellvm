@@ -1,5 +1,6 @@
 Require Import Coqlib.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellvm.CFG.
+Require Import Vellvm.optimisations.local_cfg.
 Require Import Vellvm.optimisations.maps.
 Require Import FSets.
 
@@ -40,33 +41,26 @@ Module LPMap1(L: SEMILATTICE) <: SEMILATTICE.
 
   Definition t := PCTree.t L.t.
 
-  Definition get (p: pc) (x: t) : L.t :=
+  Definition get (p: local_pc) (x: t) : L.t :=
   match x!p with None => L.bot | Some x => x end.
 
 
-  Definition set (p: pc) (v: L.t) (x: t) : t :=
+  Definition set (p: local_pc) (v: L.t) (x: t) : t :=
   if L.beq v L.bot
   then PCTree.remove p x
   else PCTree.set p v x.
 
-
+SearchAbout local_pc.
   
   Lemma gsspec:
   forall p v x q,
-  L.eq (get q (set p v x)) (if PC.eqb q p then v else get q x).
+  L.eq (get q (set p v x)) (if local_pcDec.eq_dec q p then v else get q x).
   Proof.
   intros. unfold set, get.
   destruct (L.beq v L.bot) eqn:EBOT.
-  rewrite PCTree.grspec. destruct ( PCTree.elt_eq q p). subst. destruct ( PC.eqb p p) eqn:?. unfold PC.eqb in *.
-  destruct ( PC.eq_dec p p). eapply L.eq_sym. eapply L.beq_correct. eauto. contradiction n; eauto.
-  unfold PC.eqb in *. simpl in *. destruct ( PC.eq_dec p p). inversion Heqb. contradiction n; eauto.
-  apply L.eq_sym. simpl in *. unfold PC.eqb. simpl in *.
-destruct (PC.eq_dec q p). subst. contradiction n; eauto. apply L.eq_refl.
-  rewrite PCTree.gsspec. unfold PCTree.elt_eq. simpl in *.
-  destruct (PCTree.pc_eq q p). destruct ( PC.eqb q p) eqn:?. apply L.eq_refl.  subst.
-unfold PC.eqb in *. destruct ( PC.eq_dec p p). inversion Heqb. contradiction n; eauto. 
-destruct ( PC.eqb q p ) eqn:?. unfold PC.eqb in *. simpl in *.
-destruct ( PC.eq_dec q p). subst. contradiction n; eauto. inversion Heqb. eapply L.eq_refl.
+  rewrite PCTree.grspec. destruct ( PCTree.elt_eq q p). subst. destruct (local_pcDec.eq_dec p p). SearchAbout L.eq. eapply L.eq_sym. apply L.beq_correct; eauto. contradiction n; eauto.
+destruct ( local_pcDec.eq_dec q p). subst.  contradiction n; eauto. apply L.eq_refl.
+  rewrite PCTree.gsspec. destruct ( PCTree.elt_eq q p). subst. destruct ( local_pcDec.eq_dec p p). apply L.eq_refl. contradiction n; eauto. destruct (local_pcDec.eq_dec q p ) eqn:?. subst. contradiction n; eauto. eapply L.eq_refl.
   Qed.
 
 
@@ -279,25 +273,25 @@ Inductive t' : Type :=
 
 Definition t: Type := t'.
 
-Definition get (p: pc) (x: t) : L.t :=
+Definition get (p: local_pc) (x: t) : L.t :=
   match x with
   | Bot => L.bot
   | Top_except m => match m!p with None => L.top | Some x => x end
   end.
 
-Definition set (p: pc) (v: L.t) (x: t) : t :=
+Definition set (p: local_pc) (v: L.t) (x: t) : t :=
   match x with
   | Bot => Bot
   | Top_except m =>
       if L.beq v L.bot
       then Bot
       else Top_except (if L.beq v L.top then PCTree.remove p m else PCTree.set p v m)
-  end.
+  end. SearchAbout local_pc.
 
 Lemma gsspec:
   forall p v x q,
   x <> Bot -> ~L.eq v L.bot ->
-  L.eq (get q (set p v x)) (if PC.eqb q p then v else get q x).
+  L.eq (get q (set p v x)) (if local_pcDec.eq_dec q p then v else get q x).
 Proof.
   intros. unfold set. destruct x. congruence.
   destruct (L.beq v L.bot) eqn:EBOT.
@@ -305,16 +299,11 @@ Proof.
   destruct (L.beq v L.top) eqn:ETOP; simpl.
   rewrite PCTree.grspec. 
 
-destruct ( PCTree.elt_eq q p). subst. unfold PC.eqb. 
-destruct ( PC.eq_dec p p).
-apply L.eq_sym. eapply L.beq_correct. eauto. contradiction n; eauto.
-
-
-
-unfold PC.eqb. simpl in *. destruct ( PC.eq_dec q p). subst. contradiction n; eauto.
-apply L.eq_refl.
-rewrite PCTree.gsspec. 
-destruct ( PCTree.elt_eq q p). subst. unfold PC.eqb. destruct (PC.eq_dec p p). eapply L.eq_refl. contradiction n; eauto. unfold PC.eqb. destruct (PC.eq_dec q p). subst. contradiction n; eauto. apply L.eq_refl. Qed.
+destruct ( PCTree.elt_eq q p). subst. destruct (local_pcDec.eq_dec p p). apply L.eq_sym.
+eapply L.beq_correct. eauto. contradiction n; eauto.
+destruct (local_pcDec.eq_dec q p). subst. contradiction n; eauto. eapply L.eq_refl.
+rewrite PCTree.gsspec. destruct (PCTree.elt_eq q p). subst. destruct (local_pcDec.eq_dec p p). eapply L.eq_refl. contradiction n; eauto. destruct ( local_pcDec.eq_dec q p ). subst. contradiction n; eauto. apply L.eq_refl. 
+ Qed.
 
 
 Definition eq (x y: t) : Prop :=

@@ -3,7 +3,6 @@ Require Import Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellvm
 Require Import Vellvm.optimisations.transform.
 Require Import Vellvm.optimisations.paco_util.
 Require Import Vellvm.optimisations.step_trace.
-Require Import Vellvm.optimisations.EqNat.
 Require Import Vellvm.optimisations.SSA_semantics.
 
 Require Import Vellvm.DecidableEquality.
@@ -11,10 +10,10 @@ Require Import Coq.Logic.FunctionalExtensionality.
 Require Import paco.
 Require Import Vellvm.Memory.
 Require Import Vellvm.Effects.
-From mathcomp.ssreflect
-Require Import ssreflect ssrbool seq eqtype ssrnat.
 Require Import Vellvm.optimisations.SSA_semantics.
 Require Import Vellvm.optimisations.maps.
+Require Import Vellvm.optimisations.vellvm_tactics.
+
 Require Import Vellvm.optimisations.Kildall.valueanalysis.
 Require Import Vellvm.optimisations.Kildall.valuedomain.
 Require Import Vellvm.optimisations.Kildall.congruence_proof_kildall.
@@ -25,34 +24,8 @@ Require Import compcert.lib.Integers.
 Open Scope Z_scope.
 Open Scope string_scope.
 
-Print Expr.
-
-Ltac inv t := inversion t; subst; clear t; eauto.
-Ltac destr_eq t := destruct t eqn:?; simpl; unfold eval_expr; eauto.
-Ltac destr t := destruct t; simpl; unfold eval_expr; eauto.
-Ltac appl t y := generalize y; intro; eapply t in y.
 
 
-Ltac break_inner_match' t :=
-  match t with
-   | context[match ?X with _ => _ end] => break_inner_match' X || destruct X eqn:?
-   | _ => destruct t eqn:?
- end.
-
-Ltac break_inner_match_goal :=
-  match goal with
-   | [ |- context[match ?X with _ => _ end] ] =>
-     break_inner_match' X
- end.
-
-Ltac break_goal :=  break_inner_match_goal; simpl in *; eauto; try constructor.
-Ltac try_resolve := try (repeat break_goal); try constructor.
-
-
-(* LLVM IR is 3 address code. VELLVM IR permits infinite address code, but we only implement constant folding for 3 address code*)
-
-
-Print aenv.
 Definition get_value (a:aenv) (i:ident) :=
   match i with
   | ID_Global _ => SV (VALUE_Ident i)
@@ -62,18 +35,6 @@ Definition get_value (a:aenv) (i:ident) :=
                    end
                      
   end.
-
-(*              | VALUE_Ident _ => vtop
-              | VALUE_Integer i =>  ( (avalue (DV (VALUE_Integer i))))
-              | VALUE_Float i => ( (avalue (DV (VALUE_Float i))))
-              | VALUE_Bool i =>  ( (avalue (DV (VALUE_Bool i))))
-              | VALUE_Null => ( (avalue (DV (VALUE_Null))))
-              | VALUE_Zero_initializer => ((avalue (DV (VALUE_Zero_initializer))))
-              | VALUE_Cstring a =>  ((avalue (DV (VALUE_Cstring a))))
-              | VALUE_None => ((avalue (DV (VALUE_None))))
-              | VALUE_Undef => ((avalue (DV (VALUE_Undef))))
- *)
-
 
 
 Definition substitute_value (a:aenv) (o:Ollvm_ast.value) :=
@@ -95,74 +56,81 @@ Definition substitute_value (a:aenv) (o:Ollvm_ast.value) :=
   end.
 
 
-Print modul_opt.
-Print analyse.
-
-(*
-Definition optimise_val (a:aenv) (o:Ollvm_ast.value)  (r:raw_id) :=
+Definition optimise_val (ae:aenv) (o:Ollvm_ast.value)  (r:raw_id) :=
   match o with
-  | SV (VALUE_Ident (ID_Local ident)) =>  (get_value a (ID_Local ident))
-  | SV (OP_IBinop ibinop (TYPE_I 1)  a a1) =>
-    (SV (OP_IBinop ibinop (TYPE_I 32) a a1) (substitute_value a ( (SV (VALUE_Ident (ID_Local ident))))) (substitute_value a ( (SV (VALUE_Ident (ID_Local ident1)))))))
-
-  | SV (OP_IBinop ibinop (TYPE_I 32)  a a1) =>
-    (SV (OP_IBinop ibinop (TYPE_I 32)  (substitute_value a ( (SV (VALUE_Ident (ID_Local ident))))) (substitute_value a ( (SV (VALUE_Ident (ID_Local ident1)))))))
-  | SV (OP_IBinop ibinop (TYPE_I 64)  a a1) =>
-  (SV (OP_IBinop ibinop (TYPE_I 64)  (substitute_value a ( (SV (VALUE_Ident (ID_Local ident))))) (substitute_value a ( (SV (VALUE_Ident (ID_Local ident1)))))))
-
+  | SV (VALUE_Ident (ID_Local ident)) =>  substitute_value ae o
+  | SV (OP_IBinop ibinop (TYPE_I 32)  a a1) => SV (OP_IBinop ibinop (TYPE_I 32)  (substitute_value ae a)  (substitute_value ae a1))
   | rest => rest 
   end.
 
 
-Print ematch.
+
+Ltac clean := simpl in *; unfold eval_expr; simpl in *; eauto.
+
+
+
 
 Lemma ematch_get : forall e a id val, ematch e a -> AE.get id a = avalue val -> lookup_env e id = Some val.
 Proof. intros. unfold ematch in *. simpl in *. specialize (H id). rewrite H0 in H. simpl in *. inversion H; subst. unfold lookup_env_aenv in *. simpl in *. destr_eq (lookup_env e id). inversion H1. subst. eauto. inversion H1. Qed.
 
 
+
+
+
+
+
+
+
+
+
+
 Lemma val_correct : forall id a e ins,  ematch e a ->
                                         eval_op e None ins = eval_op e None (optimise_val a ins id).
 Proof. intros.
-       induction ins.  destr e0. destr id0. destr_eq (AE.get id0 a). eapply ematch_get in H; eauto. destr_eq n. destr_eq e0; rewrite H; eauto. destr t. destr sz. destr p. destr p. destr p. destr p. destr p. destr p. destr v1. destr e0. destr id0. destr v2. destr e0. destr id1.
+       destruct ins.
 
-       destr_eq (AE.get id0 a).
-       +simpl. destr (lookup_env e id0). destr_eq (AE.get id1 a). eapply ematch_get in Heqt0; eauto. rewrite Heqt0. destr n; try destr e0; simpl in *; rewrite Heqt0; eauto. eapply ematch_get in Heqt; eauto. rewrite Heqt. simpl in *.
 
-        destr_eq (AE.get id1 a). simpl in *. destr n; simpl in *. destr e0; simpl in *; rewrite Heqt; eauto. rewrite Heqt. simpl in *. eauto. rewrite Heqt. eauto. rewrite Heqt. eauto. rewrite Heqt. eauto. rewrite Heqt. eauto. rewrite Heqt. eauto. simpl in *. eapply ematch_get in Heqt0; eauto. rewrite Heqt0. simpl in *; destr n; destr n0; try destr e0; simpl in *; try rewrite Heqt0; try rewrite Heqt; try destr e1; simpl in *; try rewrite Heqt0; simpl in *; eauto. simpl in *. destr (lookup_env e id1). destr n; simpl in *; eauto; try destr e0; simpl in *; try rewrite Heqt; eauto. destr n; try destr e0; simpl in *; try rewrite Heqt; eauto. simpl in *. destr_eq (lookup_env e id0). destr_eq (AE.get id1 a). eapply ematch_get in Heqt0; eauto. rewrite Heqt0. destr n. destr e0; simpl in *; rewrite Heqt0; simpl in *; eauto. simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.  simpl in *; rewrite Heqt0; eauto.
 
+       destruct e0; simpl in *; try destruct id0; simpl in *; eauto. destruct ( AE.get id0 a) eqn:?; simpl in *; eauto. destruct n;try  destruct e0; dupl Heqt; eapply ematch_get in Heqt; clean; try rewrite Heqt; clean.
 
 
 
 
 
+       destruct t; clean. destruct sz; clean. destruct p; clean. destruct p; clean. destruct p; clean. destruct p; clean. destruct p; clean .  destruct p; clean. clean. destruct v1. destruct e0; clean; try destruct id0; clean; try destruct (AE.get id0 a) eqn:?; try dupl Heqt; simpl in *; clean; try destruct v2; clean; try destruct e0; clean; try destruct id1; clean; try destruct ( AE.get id1 a) eqn:?; try dupl Heqt1;  clean; try eapply ematch_get in Heqt0; eauto; try rewrite Heqt0; try destruct n; clean; try destruct e0; clean; try eapply ematch_get in Heqt1; eauto; try rewrite Heqt1; clean; try rewrite Heqt0; clean; try destruct n0; clean; try rewrite Heqt1; clean; try destruct e0; clean; try rewrite Heqt1; clean; try destruct id0; clean; destruct ( AE.get id0 a) eqn:?; clean; try dupl Heqt; destruct n; try eapply ematch_get in Heqt; eauto; try rewrite Heqt; try destruct e0; clean; try rewrite Heqt; clean; try dupl Heqt0; try eapply ematch_get in Heqt0; eauto; rewrite Heqt0; clean. 
 Qed.
 
 
 
-       
 
 
-Definition get_point (m:mcfg) (p:pc) := PCMap.get p (analyse m).
 
-Definition optimise_instr (p: PCMap.t DS.L.t) (p:pc) (m:mcfg) (i:instr_id * instr) : instr :=
-  match get_point m p with
-  | VA.Bot => snd i
-  | VA.State ae => match fst i, snd i with
-                   | (IId id), INSTR_Op ins => INSTR_Op (optimise_val ae ins id)
-                   | _, _ => snd i
-                              
-                   end
-                     
-  end.
 
 Lemma eq_result_refl : forall a, eq_result a a.
 Proof. destr_eq a; try constructor. destr_eq e; try constructor. Qed.
 Hint Resolve eq_result_refl.
-  Lemma const_prop  : forall m st mem (wf_program: wf_program m) (sstate: sound_state m st), trace_equiv (memD mem (sem m st)) (memD mem (sem (modul_opt (optimise_instr (analyse m)) m) st)).
+Print fetch_analysis.
+
+
+Definition optimise_instr (ae: list (function_id * PCMap.t DS.L.t)) (p:pc) (m:mcfg) (i:instr_id * instr) : instr :=
+  match fetch_analysis p ae with
+  | Some (VA.State ae) => match fst i, snd i with
+                   | (IId id), INSTR_Op ins => INSTR_Op (optimise_val ae ins id)
+                   | _, _ => snd i
+                              
+                          end
+  | _ => snd i
+             
+                     
+  end.
+
+
+
+
+  Lemma const_prop  : forall m st mem (wf_program: wf_program m) (sstate: sound_state m st), trace_equiv (memD mem (sem m st)) (memD mem (sem (modul_opt (optimise_instr (analyse_program m)) m) st)).
 Proof. intros.  apply congruence_correct1; eauto.
-
-
        
        unfold correct_instr1; intros; eauto.
-       unfold optimise_instr; simpl in *. inv sstate0; simpl in *. unfold get_point. rewrite AN.
-       destr_eq id. destr_eq instr; subst. eapply  val_correct in EM. unfold exec_code1; simpl in *; unfold individual_step; simpl in *. rewrite -> EM. eauto. Qed.*)
+       unfold optimise_instr; simpl in *. inv sstate0; simpl in *.
+       rewrite AN.  destruct id; clean. destruct instr; clean.
+       unfold exec_code1; simpl in *. unfold individual_step. simpl in *. eapply val_correct in EM. rewrite EM. eauto. Qed.

@@ -1,5 +1,3 @@
-Print nat.
-
 Require Import Vellvm.optimisations.Kildall.lattice.
 Require Import Vellvm.optimisations.maps.
 
@@ -9,7 +7,6 @@ Require Import Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellvm
 Require Import Vellvm.optimisations.transform.
 Require Import Vellvm.optimisations.paco_util.
 Require Import Vellvm.optimisations.step_trace.
-Require Import Vellvm.optimisations.EqNat.
 
 Require Import Vellvm.DecidableEquality.
 Require Import Vellvm.DecidableProp.
@@ -28,6 +25,8 @@ Inductive aval : Type :=
 . 
 
 
+
+Print SEMILATTICE_WITH_TOP.
 Module AVal <: SEMILATTICE_WITH_TOP.
 
   Definition t := aval.
@@ -97,6 +96,7 @@ Lemma eq_trans: forall x y z, eq x y -> eq y z -> eq x z.
     Proof. intros. destruct x; simpl in *; eauto. Qed.
     
 
+Print aval.
     Definition lub (a b: aval) :=
       match a, b with
       | vbot, _ => b
@@ -126,12 +126,7 @@ unfold decide. destruct (eq_dvalue n n0); simpl in *; subst; eauto. unfold decid
 Proof. destruct x; simpl in *; eauto. Qed.
        
 End AVal.
-Print lidMap.
-Print LPMap.
 
-
-
-Print lidPMap.
 Module AE := lidPMap(AVal).
 
 Definition aenv := AE.t.
@@ -158,10 +153,8 @@ destruct x. simpl in *. eauto. simpl in *. apply AE.eq_refl. Qed.
   Proof. intros.  destruct x, y; simpl in *; eauto. apply AE.eq_sym in H. auto. Qed.
 
   Lemma eq_trans: forall x y z, eq x y -> eq y z -> eq x z.
-  Proof.
-        destruct x, y, z; simpl; try tauto. intros.
-    eapply AE.eq_trans; eauto.
-Qed.
+Proof.
+Admitted.
 
 
 Definition beq (x y: t) : bool :=
@@ -172,10 +165,7 @@ Definition beq (x y: t) : bool :=
     end.
 
   Lemma beq_correct: forall x y, beq x y = true -> eq x y.
-Proof.    destruct x, y; simpl; intros.
-    auto. congruence. congruence. eapply AE.beq_correct. eauto. Qed.
-
-
+Proof. Admitted.
 
   Definition ge (x y: t) : Prop :=
     match x, y with
@@ -185,20 +175,18 @@ Proof.    destruct x, y; simpl; intros.
     end.
 
   Lemma ge_refl: forall x y, eq x y -> ge x y.
-  Proof. intros. destruct x, y; eauto. unfold eq in *. inversion H.
-         unfold eq in *. simpl in *. apply AE.ge_refl. auto. Qed.
+Proof.
+Admitted.
 
 Lemma ge_trans: forall x y z, ge x y -> ge y z -> ge x z.
 Proof.
-      destruct x, y, z; simpl; try tauto. intros.
-    eapply AE.ge_trans; eauto.
-  Qed.
-
+Admitted.
 
 
   Definition bot : t := Bot.
   Lemma ge_bot: forall x, ge x bot.
-Proof. intros. destruct x; simpl; eauto. Qed.
+Proof.
+Admitted.
 
 
 Definition lub (x y: t) : t :=
@@ -209,23 +197,13 @@ Definition lub (x y: t) : t :=
     end.
 
   Lemma ge_lub_left: forall x y, ge (lub x y) x.
-  Proof.
-        destruct x, y.
-    apply ge_refl; apply eq_refl.
-    simpl. auto.
-    apply ge_refl; apply eq_refl.
-    simpl. eapply AE.ge_lub_left.
-Qed.
+Proof.
+Admitted.
 
 
 Lemma ge_lub_right: forall x y, ge (lub x y) y.
 Proof.
-    destruct x, y.
-    apply ge_refl; apply eq_refl.
-    apply ge_refl; apply eq_refl.
-    simpl. auto.
-    simpl. apply AE.ge_lub_right.
-  Qed.
+Admitted.
 
 End VA.
 
@@ -235,7 +213,7 @@ End VA.
 
 Definition lookup_env_aenv (e:env) (id:raw_id) : aval :=
   match lookup_env e id with
-  | None => vbot
+  | None => vtop
   | Some a => avalue a
   end.
 
@@ -283,8 +261,6 @@ Lemma vmatch_false : forall e p, vmatch (lookup_env_aenv e p) AVal.bot -> False.
 Proof. intros. inversion H. Qed.
 
 
-
-
 Lemma ematch_update:
   forall e ae v av r,
   ematch e ae -> vmatch (avalue v) av -> ematch (add_env r v e) (AE.set r av ae).
@@ -307,15 +283,4 @@ unfold lookup_env_aenv, add_env, lookup_env in *; simpl in *.
 destruct (AstLib.RawID.eq_dec p r), (loc_id_eq p r); subst; eauto; try contradiction n; eauto.
 Qed.
 
-
-
-
-Lemma ematch_add : forall id e ae v 
-(EM : ematch e ae),
-              ematch ((id, v) :: e) (AE.set id vtop ae).
-Proof. intros. eapply ematch_update; eauto; try constructor. Qed.
-Hint Resolve ematch_add.
-
-Lemma ematch_top : forall e0, ematch e0 (AE.Top_except [::]).
-Proof. intros. constructor. Qed. Hint Resolve ematch_top.
 
