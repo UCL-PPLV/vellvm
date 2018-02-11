@@ -1,3 +1,4 @@
+
 Require Import ZArith List String Omega.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.StepSemantics.
@@ -8,36 +9,43 @@ Set Contextual Implicit.
 
 Module A : Vellvm.StepSemantics.ADDR with Definition addr := nat.
   Definition addr := nat.
+  Definition null := 1000%nat.   (* TODO this is unsound if the memory has > 1000 values *)
 End A.  
 
 Module SS := StepSemantics.StepSemantics(A).
 Export SS.
 
 Definition memory := list dvalue.
-Definition undef := DV VALUE_Undef.
-Print state. Print replace.
+Definition undef t := DVALUE_Undef t None.
+
 Definition mem_step {X} (e:effects X) (m:memory) :=
   match e with
   | Alloca t k =>
-    inr  ((m ++ [undef])%list,
+    inr  ((m ++ [undef t])%list,
           DVALUE_Addr (List.length m),
           k)
-  | Load a k =>
+  | Load t a k =>
     inr (m,
-         nth_default undef m a,
+         nth_default (undef t) m a,
          k)
 
   | Store a v k =>
     inr (replace m a v,
-         DV VALUE_None,
+         DVALUE_None,
          k)
 
-  | Call _ _ _ => inl e
-  end.
-Print mem_step.
-Print instr.
-Print effects.
+  | GEP t a vs k => inl e (* TODO: GEP semantics *)
 
+  | ItoP t i k => inl e (* TODO: ItoP semantics *)
+
+  | PtoI t a k => inl e (* TODO: ItoP semantics *)                     
+                       
+  | Call _ _ _ _ => inl e
+  end.
+
+(*
+ memory -> Trace () -> Trace () -> Prop
+*)
 
 CoFixpoint memD (m:memory) (d:Trace ()) : Trace () :=
   match d with
@@ -61,23 +69,6 @@ Fixpoint MemDFin (m:memory) (d:Trace ()) (steps:nat) : option memory :=
     | Vis (Eff e)  =>
       match mem_step e m with
       | inr (m', v, k) => MemDFin m' (k v) x
-      | inl _ => None
-      end
-    end
-  end%N.
-
-
-Fixpoint MemDFin1 (m:memory) (d:Trace ()) (steps:nat) : option memory :=
-  match steps with
-  | O => Some m
-  | S x =>
-    match d with
-    | Vis (Fin d) => Some m
-    | Vis (Err s) => None
-    | Tau _ d' => MemDFin1 m d' x
-    | Vis (Eff e)  =>
-      match mem_step e m with
-      | inr (m', v, k) => MemDFin1 m' (k v) x
       | inl _ => None
       end
     end

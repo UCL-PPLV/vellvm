@@ -38,6 +38,7 @@ examples.mli
 src/ml/extracted/*.ml
 src/ml/extracted/STAMP
 src/.depend
+<<<<<<< HEAD
 /lib/paco
 /lib/CompCert
 <<<<<<< HEAD
@@ -59,3 +60,6 @@ cv/*.out
 .#*
 =======
 >>>>>>> 1c17711c6d2d75e459d5679568823952fe9498ef
+=======
+output
+>>>>>>> e1af04c5713e0b41a9659a0b2fa40f8e64197d0a

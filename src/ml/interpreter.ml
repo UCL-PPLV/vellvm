@@ -12,7 +12,6 @@
  
 let print_int_dvalue dv : unit =
   match dv with
-  | SS.DV (Ollvm_ast.VALUE_Integer i) -> Printf.printf "Program terminated with: VALUE_Integer(%d)\n" (Camlcoq.Z.to_int i)
   | SS.DVALUE_I1 (x) -> Printf.printf "Program terminated with: DVALUE_I1(%d)\n" (Camlcoq.Z.to_int (StepSemantics.Int1.unsigned x))
   | SS.DVALUE_I32 (x) -> Printf.printf "Program terminated with: DVALUE_I32(%d)\n" (Camlcoq.Z.to_int (StepSemantics.Int32.unsigned x))
   | SS.DVALUE_I64 (x) -> Printf.printf "Program terminated with: DVALUE_I64(%d) [possible precision loss: converted to OCaml int]\n"
@@ -24,7 +23,10 @@ let rec step m =
   | SS.E.Tau (_, x) -> step x
   | SS.E.Vis (Fin v) -> print_int_dvalue v
   | SS.E.Vis (Err s) -> failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
-  | SS.E.Vis (Eff (SS.E.Call(f, args, k))) -> ()
+  | SS.E.Vis (Eff (SS.E.Call(t, f, args, k))) ->
+    (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n" (Camlcoq.camlstring_of_coqstring f));
+    step (k (SS.DVALUE_I64 StepSemantics.Int64.zero))
+    
   | SS.E.Vis (Eff _) -> failwith "should have been handled by the memory model"  
       
 

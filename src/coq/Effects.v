@@ -23,7 +23,9 @@ Module Type EffT.
   Parameter typ : Set.
   Parameter addr : Set.
   Parameter value : Set.
+  Parameter ptr_int_type : Set.
   Parameter inj_addr: addr -> value.
+  Parameter inj_int : ptr_int_type -> value.
   Parameter no_value : value.  (* Morally DV VALUE_None *)
 End EffT.
 
@@ -37,20 +39,39 @@ Export ET.
      we would also have to expose the "Ret" instruction. 
 
    - What is the correct way to model global data? 
+
+   - Note: one might think that Store should take a continuation k of type
+     d, but that would imply an "asynchronous" interaction.
+
+
+  DESIGN QUESTIONS: 
+    - should Load, Store, GEP take addr as the pointer or should
+      they take values?  Who's job is it to do the case analysis?
+    - similarly, should Store take a value and Load return a value?
+    - how does the continuation raise an error?    
+
+    Call: should the name be a value, a global id, or a string? 
+    external calls are identified by strings, for now
 *)
 Inductive effects (d:Type) : Type :=
 | Alloca (t:typ)  (k:value -> d)        (* Stack allocation *)
-| Load   (a:addr) (k:value -> d)
+| Load   (t:typ) (a:addr) (k: value -> d)
 | Store  (a:addr) (v:value) (k:value -> d)
-| Call   (v:value) (args:list value) (k:value -> d)
+| GEP    (t:typ) (v:addr) (vs:list value) (k:value -> d)
+| ItoP   (t:typ) (i:ptr_int_type) (k:value -> d)
+| PtoI   (t:typ) (a:addr) (k:value -> d)  (* uses inj_int *)
+| Call   (t:typ) (f:string) (args:list value) (k:value -> d)
 .    
 
 Definition effects_map {A B} (f:A -> B) (m:effects A) : effects B :=
   match m with
   | Alloca t g => Alloca t (fun a => f (g a))
-  | Load a g  => Load a (fun dv => f (g dv))
+  | Load t a g  => Load t a (fun dv => f (g dv))
   | Store a dv d => Store a dv (fun dv => f (d dv))
-  | Call v args d => Call v args (fun dv => f (d dv))
+  | GEP t v vs d => GEP t v vs (fun dv => f (d dv))
+  | ItoP  t i d => ItoP t i (fun dv => f (d dv))
+  | PtoI  t a d => PtoI t a (fun dv => f (d dv))                       
+  | Call t s args d => Call t s args (fun dv => f (d dv))
   end.
 
 Instance effects_functor : Functor effects := fun A => fun B => @effects_map A B.
@@ -145,7 +166,9 @@ Hint Resolve diverges_step_mono : paco.
 Definition diverges {X} := paco1 (@diverges_step X) bot1.
 Hint Unfold diverges.
 
-(* traceervational equivalence ------------------------------------------------ *)
+(* observational equivalence ------------------------------------------------ *)
+
+(* TODO: fix up once Effects interface is stable
 
 Section RELATED_EFFECTS.
   Variable X : Type.
@@ -175,10 +198,11 @@ Section RELATED_EFFECTS.
         related_effect_step (Alloca t k1) (Alloca t k2)
 
   | related_effect_Load :
-      forall a1 a2 k1 k2
+      forall a1 a2 t1 t2 k1 k2
         (HRa : a1 = a2)
+        (HRt : t1 = t2)
         (HRk : (forall (v1 v2:value), v1 = v2 -> R (k1 v1) (k2 v2))),
-        related_effect_step (Load a1 k1) (Load a2 k2)
+        related_effect_step (Load a1 t1 k1) (Load a2 t2 k2)
 
   | related_effect_Store  :
       forall a1 a2 v1 v2 k1 k2
@@ -764,6 +788,8 @@ Hint Resolve error_free_trace_step_monotone : paco.
 
 Definition error_free_trace d := paco1 error_free_trace_step bot1 d.
 Hint Unfold error_free_trace.
+*)
+
 *)
 
 End Effects.
