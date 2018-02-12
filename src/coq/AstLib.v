@@ -12,247 +12,25 @@
 Require Import ZArith.ZArith List.
 Require Import String Omega.
 Require Import Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util.
-Require Import Equalities OrderedType OrderedTypeEx Compare_dec.
+Require Import Equalities.
 Import ListNotations.
 
 (* Equalities --------------------------------------------------------------- *)
 Instance eq_dec_int : eq_dec int := Z_eq_dec.
 
-Require Import Ascii.
-
-Module AsciiOrd <: UsualOrderedType.
-  Definition t := ascii.
-  Definition eq := @eq t.
-  Definition eq_refl := @eq_refl t.
-  Definition eq_sym := @eq_sym t.
-  Definition eq_trans := @eq_trans t.
-  Definition lt (a b:ascii) := N.lt (N_of_ascii a) (N_of_ascii b).
-  Lemma lt_trans : forall a b c:t, lt a b -> lt b c -> lt a c.
-  Proof.
-    intros a b c.
-    unfold lt.
-    apply N.lt_trans.
-  Qed.
-  Lemma lt_not_eq : forall a b:t, lt a b -> ~eq a b.
-  Proof.
-    intros a b H.
-    unfold eq. unfold not. intros He. rewrite He in H.
-    eapply N.lt_neq. unfold lt in H. apply H. reflexivity.
-  Qed.
-
-  Lemma N_of_ascii_inj : forall x y, N_of_ascii x = N_of_ascii y -> x = y.
-  Proof.
-    intros x y H.
-    rewrite <- ascii_N_embedding.
-    rewrite <- (@ascii_N_embedding x).
-    rewrite H. reflexivity.
-  Defined.
-  
-  Program Definition compare (x y: t) : Compare lt eq x y :=
-    match N_as_OT.compare (N_of_ascii x) (N_of_ascii y) with
-    | LT p => _
-    | EQ p => _
-    | GT p => _
-    end.
-  Next Obligation.
-    apply LT. unfold lt. auto.
-  Defined.
-  Next Obligation.
-    apply EQ. unfold eq. apply N_of_ascii_inj. auto.
-  Defined.
-  Next Obligation.
-    apply GT. unfold lt. auto.
-  Defined.
-
-  Definition eq_dec := ascii_dec.
-End AsciiOrd.
-
-Module AsciiOrdFacts := OrderedTypeFacts(AsciiOrd).
-
-Module StringOrd <: UsualOrderedType.
-  Definition t := string.
-  Definition eq := @eq t.
-  Definition eq_refl := @eq_refl t.
-  Definition eq_sym := @eq_sym t.
-  Definition eq_trans := @eq_trans t.
-  Fixpoint lt (s1 s2:string) : Prop :=
-    match s1, s2 with
-    | EmptyString, EmptyString => False
-    | EmptyString, String _ _ => True
-    | String a s1', String b s2' =>
-      match AsciiOrd.compare a b with
-      | LT _ => True
-      | EQ _ => lt s1' s2'
-      | GT _ => False
-      end
-    | String _ _, EmptyString => False
-    end.
-
-  Lemma lt_trans : forall a b c : t, lt a b -> lt b c -> lt a c.
-  Proof.
-    induction a.
-    - destruct b; destruct c; simpl; intros; try tauto.
-    - destruct b; destruct c; simpl; intros; try tauto.
-      destruct (AsciiOrd.compare a a1); try tauto.
-      + destruct (AsciiOrd.compare a1 a2); try tauto.
-        * AsciiOrdFacts.elim_comp; auto.
-        * AsciiOrdFacts.elim_comp; auto.
-      + destruct (AsciiOrd.compare a1 a2); try tauto.
-        * AsciiOrdFacts.elim_comp; auto.
-        * AsciiOrdFacts.elim_comp; auto.
-          eapply IHa; eauto.
-  Qed.          
-      
-  Lemma lt_not_eq : forall a b:t, lt a b -> ~eq a b.
-  Proof.
-    induction a; intros b H He; unfold eq in He; subst.
-    - unfold lt in H. destruct H.
-    - simpl in H.
-      destruct (AsciiOrd.compare a a); auto.
-      apply AsciiOrd.lt_not_eq in l. apply l. AsciiOrdFacts.order.
-      apply IHa in H. apply H. unfold eq. reflexivity.
-  Qed.
-
-  Program Fixpoint compare (s1 s2 : t) : Compare lt eq s1 s2 :=
-    match s1, s2 with
-    | EmptyString, EmptyString => _
-    | EmptyString, String b s2' => _
-    | String a s1', String b s2' =>
-      match AsciiOrd.compare a b with
-      | LT _ => _
-      | EQ _ => match compare s1' s2' with
-               | LT _ => _
-               | EQ _ => _
-               | GT _ => _
-               end
-      | GT _ => _ 
-      end
-    | String a s1', EmptyString => _
-    end.
-  Next Obligation.
-    apply EQ. unfold eq. reflexivity.
-  Defined.
-  Next Obligation.
-    apply LT. simpl. auto.
-  Defined.
-  Next Obligation.
-    apply LT. simpl. rewrite <- Heq_anonymous. auto.
-  Defined.
-  Next Obligation.
-    apply LT. simpl. rewrite <- Heq_anonymous0. auto.
-  Defined.
-  Next Obligation.
-    apply EQ. simpl. unfold AsciiOrd.eq in wildcard'0. subst. unfold eq in e. subst. reflexivity.
-  Defined.
-  Next Obligation.
-    apply GT. simpl. unfold AsciiOrd.eq in wildcard'0. subst.
-    rewrite <- Heq_anonymous0. auto.
-  Defined.
-  Next Obligation.
-    apply GT. simpl. AsciiOrdFacts.elim_comp_lt b a. auto.
-  Defined.
-  Next Obligation.
-    apply GT. simpl. auto.
-  Defined.
-    
-  Definition eq_dec := string_dec.
-End StringOrd.
-Module StringOrdFacts := OrderedTypeFacts(StringOrd).
-
-
-Module RawIDOrd <: UsualOrderedType.
+Module RawIDDec <: MiniDecidableType.
   Definition t := raw_id.
-  Definition eq := @eq t.
-  Definition eq_refl := @eq_refl t.
-  Definition eq_sym := @eq_sym t.
-  Definition eq_trans := @eq_trans t.
-
-  (* Anon < Name < Raw *)
-  Definition lt (x:t) (y:t) : Prop :=
-    match x,y with
-    | Anon n1, Anon n2 => (n1 < n2)%Z
-    | Name s1, Name s2 => StringOrd.lt s1 s2
-    | Raw n1, Raw n2 => (n1 < n2)%Z
-    | Anon _, _ => True
-    | Name _, Raw _ => True
-    | _, _ => False 
-    end.
-
-  Lemma lt_trans : forall a b c : t, lt a b -> lt b c -> lt a c.
+  Lemma eq_dec : forall (x y : raw_id), {x = y} + {x <> y}.
   Proof.
-    destruct a; destruct b; destruct c; simpl; intros H1 H2; intuition.
-    - eapply StringOrd.lt_trans; eauto.
-  Qed.
-
-  Lemma lt_not_eq : forall a b:t, lt a b -> ~eq a b.
-  Proof.
-    destruct a; destruct b; simpl; intros H He; inversion He; subst.
-    - apply StringOrd.lt_not_eq in H. apply H. unfold StringOrd.eq. reflexivity.
-    - apply Z_as_OT.lt_not_eq in H. tauto.
-    - apply Z_as_OT.lt_not_eq in H. tauto.
-  Qed.
-
-  Program Definition compare (x:t) (y:t) : Compare lt eq x y :=
-    match x,y with
-    | Anon n1, Anon n2 =>
-      match Z_as_OT.compare n1 n2 with
-      | LT _ => LT _
-      | EQ _ => EQ _
-      | GT _ => GT _
-      end
-    | Anon _, Name _ => LT _
-    | Anon _, Raw _ => LT _
-    | Name _, Anon _ => GT _
-    | Name s1, Name s2 =>
-      match StringOrd.compare s1 s2 with
-      | LT _ => LT _
-      | EQ _ => EQ _
-      | GT _ => GT _
-      end
-    | Name _, Raw _ => LT _
-    | Raw _, Anon _ => GT _
-    | Raw _, Name _ => GT _
-    | Raw n1, Raw n2 =>
-      match Z_as_OT.compare n1 n2 with
-      | LT _ => LT _
-      | EQ _ => EQ _
-      | GT _ => GT _
-      end
-    end.
-  Next Obligation.
-    unfold Z_as_OT.eq in wildcard'. subst. unfold eq. reflexivity.
-  Defined.
-  Next Obligation.
-    unfold StringOrd.eq in wildcard'. subst. unfold eq. reflexivity.
-  Defined.
-  Next Obligation.
-    unfold Z_as_OT.eq in wildcard'. subst. unfold eq. reflexivity.
-  Defined.
-
-  Definition eq_dec : forall (x y : t), {x = y} + {x <> y}.
     decide equality.
-    - apply string_dec.
-    - apply eq_dec_int.
-    - apply eq_dec_int.
+    - destruct (string_dec s s0); tauto.
+    - destruct (n == n0); tauto.
+    - destruct (n == n0); tauto.
   Defined.
-
-End RawIDOrd.  
-
-(* Module RawIDDec <: MiniDecidableType. *)
-(*   Definition t := raw_id. *)
-(*   Lemma eq_dec : forall (x y : raw_id), {x = y} + {x <> y}. *)
-(*   Proof. *)
-(*     decide equality. *)
-(*     - destruct (string_dec s s0); tauto. *)
-(*     - destruct (n == n0); tauto. *)
-(*     - destruct (n == n0); tauto. *)
-(*   Defined. *)
-(* End RawIDDec. *)
+End RawIDDec.
   
-(* Module RawID := Make_UDT(RawIDDec).  *)
-Instance eq_dec_raw_id : eq_dec raw_id := RawIDOrd.eq_dec.
-
-
+Module RawID := Make_UDT(RawIDDec). 
+Instance eq_dec_raw_id : eq_dec raw_id := RawID.eq_dec.
 
 Module InstrIDDec <: MiniDecidableType.
   Definition t := instr_id.
@@ -363,6 +141,7 @@ Section ValueInd.
 | VALUE_Null
 | VALUE_Zero_initializer
 | VALUE_Cstring (s:string)
+| VALUE_None                                       (* "token" constant *)
 | VALUE_Undef
 | VALUE_Struct        (fields: list (typ * a))
 | VALUE_Packed_struct (fields: list (typ * a))
@@ -387,46 +166,46 @@ Inductive value : Set :=
 | SV : Expr value -> value.
 *)
   Variable P : value -> Prop.
-  Hypothesis IH_Ident   : forall (id:ident), P ((VALUE_Ident id)).
-  Hypothesis IH_Integer : forall (x:int), P ((VALUE_Integer x)).
-  Hypothesis IH_Float   : forall (f:float), P ((VALUE_Float f)).
-  Hypothesis IH_Hex     : forall (h:float), P ((VALUE_Hex h)).  
-  Hypothesis IH_Bool    : forall (b:bool), P ((VALUE_Bool b)).
-  Hypothesis IH_Null    : P ((VALUE_Null )).
-  Hypothesis IH_Zero_initializer : P ((VALUE_Zero_initializer )).
-  Hypothesis IH_Cstring : forall (s:string), P ((VALUE_Cstring s)).
-  Hypothesis IH_Undef   : P ((VALUE_Undef )).
-  Hypothesis IH_Struct  : forall (fields: list (typ * value)), (forall p, In p fields -> P (snd p)) -> P ((VALUE_Struct fields)).
-  Hypothesis IH_Packed_struct : forall (fields: list (typ * value)), (forall p, In p fields -> P (snd p)) -> P ((VALUE_Packed_struct fields)).
-  Hypothesis IH_Array   : forall (elts: list (typ * value)), (forall p, In p elts -> P (snd p)) -> P ((VALUE_Array elts)).
-  Hypothesis IH_Vector  : forall (elts: list (typ * value)), (forall p, In p elts -> P (snd p)) -> P ((VALUE_Vector elts)).
-  Hypothesis IH_IBinop  : forall (iop:ibinop) (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P ((OP_IBinop iop t v1 v2)).
-  Hypothesis IH_ICmp    : forall (cmp:icmp)   (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P ((OP_ICmp cmp t v1 v2)).
-  Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P ((OP_FBinop fop fm t v1 v2)).
-  Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P ((OP_FCmp cmp t v1 v2)).
-  Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:typ) (v:value) (t_to:typ), P v -> P ((OP_Conversion conv t_from v t_to)).
+  Hypothesis IH_Ident   : forall (id:ident), P (SV (VALUE_Ident id)).
+  Hypothesis IH_Integer : forall (x:int), P (SV (VALUE_Integer x)).
+  Hypothesis IH_Float   : forall (f:float), P (SV (VALUE_Float f)).
+  Hypothesis IH_Bool    : forall (b:bool), P (SV (VALUE_Bool b)).
+  Hypothesis IH_Null    : P (SV (VALUE_Null )).
+  Hypothesis IH_Zero_initializer : P (SV (VALUE_Zero_initializer )).
+  Hypothesis IH_Cstring : forall (s:string), P (SV (VALUE_Cstring s)).
+  Hypothesis IH_None    : P (SV (VALUE_None )).
+  Hypothesis IH_Undef   : P (SV (VALUE_Undef )).
+  Hypothesis IH_Struct  : forall (fields: list (typ * value)), (forall p, In p fields -> P (snd p)) -> P (SV (VALUE_Struct fields)).
+  Hypothesis IH_Packed_struct : forall (fields: list (typ * value)), (forall p, In p fields -> P (snd p)) -> P (SV (VALUE_Packed_struct fields)).
+  Hypothesis IH_Array   : forall (elts: list (typ * value)), (forall p, In p elts -> P (snd p)) -> P (SV (VALUE_Array elts)).
+  Hypothesis IH_Vector  : forall (elts: list (typ * value)), (forall p, In p elts -> P (snd p)) -> P (SV (VALUE_Vector elts)).
+  Hypothesis IH_IBinop  : forall (iop:ibinop) (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P (SV (OP_IBinop iop t v1 v2)).
+  Hypothesis IH_ICmp    : forall (cmp:icmp)   (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P (SV (OP_ICmp cmp t v1 v2)).
+  Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P (SV (OP_FBinop fop fm t v1 v2)).
+  Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P (SV (OP_FCmp cmp t v1 v2)).
+  Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:typ) (v:value) (t_to:typ), P v -> P (SV (OP_Conversion conv t_from v t_to)).
   Hypothesis IH_GetElementPtr : forall (t:typ) (ptrval:(typ * value)) (idxs:list (typ * value)),
-      P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P ((OP_GetElementPtr t ptrval idxs)).
-  Hypothesis IH_ExtractElement: forall (vec:(typ * value)) (idx:(typ * value)), P (snd vec) -> P (snd idx) -> P ((OP_ExtractElement vec idx)).
+      P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P (SV (OP_GetElementPtr t ptrval idxs)).
+  Hypothesis IH_ExtractElement: forall (vec:(typ * value)) (idx:(typ * value)), P (snd vec) -> P (snd idx) -> P (SV (OP_ExtractElement vec idx)).
   Hypothesis IH_InsertElement : forall (vec:(typ * value)) (elt:(typ * value)) (idx:(typ * value)),
-      P (snd vec) -> P (snd elt) -> P (snd idx) -> P ((OP_InsertElement vec elt idx)).
+      P (snd vec) -> P (snd elt) -> P (snd idx) -> P (SV (OP_InsertElement vec elt idx)).
   Hypothesis IH_ShuffleVector : forall (vec1:(typ * value)) (vec2:(typ * value)) (idxmask:(typ * value)),
-      P (snd vec1) -> P (snd vec2 ) -> P (snd idxmask) -> P ((OP_ShuffleVector vec1 vec2 idxmask)).
-  Hypothesis IH_ExtractValue  : forall (vec:(typ * value)) (idxs:list int), P (snd vec) -> P ((OP_ExtractValue vec idxs)).
-  Hypothesis IH_InsertValue   : forall (vec:(typ * value)) (elt:(typ * value)) (idxs:list int), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue vec elt idxs)).
-  Hypothesis IH_Select        : forall (cnd:(typ * value)) (v1:(typ * value)) (v2:(typ * value)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select cnd v1 v2)).
+      P (snd vec1) -> P (snd vec2 ) -> P (snd idxmask) -> P (SV (OP_ShuffleVector vec1 vec2 idxmask)).
+  Hypothesis IH_ExtractValue  : forall (vec:(typ * value)) (idxs:list int), P (snd vec) -> P (SV (OP_ExtractValue vec idxs)).
+  Hypothesis IH_InsertValue   : forall (vec:(typ * value)) (elt:(typ * value)) (idxs:list int), P (snd vec) -> P (snd elt) -> P (SV (OP_InsertValue vec elt idxs)).
+  Hypothesis IH_Select        : forall (cnd:(typ * value)) (v1:(typ * value)) (v2:(typ * value)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P (SV (OP_Select cnd v1 v2)).
 
   Lemma value_ind' : forall (v:value), P v.
     fix IH 1.
-    destruct v. 
+    destruct v. destruct e.
     - apply IH_Ident.
     - apply IH_Integer.
     - apply IH_Float.
-    - apply IH_Hex.      
     - apply IH_Bool.
     - apply IH_Null.
     - apply IH_Zero_initializer.
     - apply IH_Cstring.
+    - apply IH_None.
     - apply IH_Undef.
     - apply IH_Struct.
       { revert fields.
@@ -538,12 +317,15 @@ Instance string_of_typ : StringOf typ := string_of_typ'.
 
 Fixpoint string_of_value' (v : value) :=
   match v with
+  | SV expr =>
+    match expr with
     | VALUE_Ident id => string_of id
     | VALUE_Integer x => string_of x
     | VALUE_Bool b => string_of b
     | VALUE_Null => "null"
     | VALUE_Zero_initializer => "zero initializer"
     | VALUE_Cstring s => s
+    | VALUE_None => "none" 
     | VALUE_Undef => "undef"                                
     | OP_IBinop iop t v1 v2 =>
       ((string_of iop) ++ " " ++ (string_of t)
@@ -556,6 +338,7 @@ Fixpoint string_of_value' (v : value) :=
     | OP_GetElementPtr t ptrval idxs =>
       "getelementptr"                                                       
     | _ => "string_of_value' todo"
+    end
   end.
 
 Instance string_of_value : StringOf value := string_of_value'.

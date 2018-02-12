@@ -1,21 +1,25 @@
 Require Import ZArith List String Omega.
-Require Import Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellvm.CFG.
+Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellvm.CFG.
+Require Import Vellvm.optimisations.transform.
 Require Import paco.
 Require Import Vellvm.Memory.
 Require Import Vellvm.Effects.
 From mathcomp.ssreflect
 Require Import ssreflect ssrbool seq eqtype ssrnat.
 
-Require Import compcert.lib.Integers compcert.lib.Floats.
+
+
+Print mcfg.
+
+Definition unroll (t:Trace ()) :=
+match t with
+  | Vis a => Vis a
+  | Tau a b => Tau a b
+end.
 
 
 
 
-
-
-
-
-  
 Lemma trace_equiv_err : forall s0 s1 r, trace_equiv_step (upaco2 (trace_equiv_step (X:=())) r)
   (Vis (trace_map (fun _ : state => ()) <$> Err s0))
   (Vis (trace_map (fun _ : state => ()) <$> Err s1)).

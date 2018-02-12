@@ -13,6 +13,10 @@
 (*                                                                     *)
 (* *********************************************************************)
 
+(*  ------------------------------------------------------------------------- *)
+(* Adapted for use in Vellvm by Steve Zdancewic (c) 2017                      *)
+(*  ------------------------------------------------------------------------- *)
+
 (* Library of useful Caml <-> Coq conversions *)
 
 open Datatypes
@@ -20,7 +24,7 @@ open BinNums
 open BinNat
 open BinInt
 open BinPos
-open Floats
+(* open Floats *)
 
 (* Coq's [nat] type and some of its operations *)
 
@@ -113,7 +117,6 @@ module P = struct
 end
 
 (* Coq's [N] type and some of its operations *)
-
 module N = struct
 
   type t = coq_N = N0 | Npos of positive
@@ -156,7 +159,6 @@ module N = struct
 end
 
 (* Coq's [Z] type and some of its operations *)
-
 module Z = struct
 
   type t = coq_Z = Z0 | Zpos of positive | Zneg of positive
@@ -265,16 +267,14 @@ end
 
 
 (* Alternate names *)
-
+(*
 let camlint_of_coqint : Integers.Int.int -> int32 = Z.to_int32
 let coqint_of_camlint : int32 -> Integers.Int.int = Z.of_uint32
    (* interpret the int32 as unsigned so that result Z is in range for int *)
 let camlint64_of_coqint : Integers.Int64.int -> int64 = Z.to_int64
 let coqint_of_camlint64 : int64 -> Integers.Int64.int = Z.of_uint64
    (* interpret the int64 as unsigned so that result Z is in range for int *)
-let camlint64_of_ptrofs : Integers.Ptrofs.int -> int64 =
-  fun x -> Z.to_int64 (Integers.Ptrofs.signed x)
-
+*)
 (* Atoms (positive integers representing strings) *)
 
 type atom = positive
@@ -325,7 +325,7 @@ let coqstring_uppercase_ascii_of_camlstring s =
   in cstring [] (String.length s - 1)
 
 (* Floats *)
-
+(*
 let coqfloat_of_camlfloat f =
   Float.of_bits(coqint_of_camlint64(Int64.bits_of_float f))
 let camlfloat_of_coqfloat f =
@@ -335,7 +335,7 @@ let coqfloat32_of_camlfloat f =
   Float32.of_bits(coqint_of_camlint(Int32.bits_of_float f))
 let camlfloat_of_coqfloat32 f =
   Int32.float_of_bits(camlint_of_coqint(Float32.to_bits f))
-
+*)
 (* Int31 *)
 
 module Int31 = struct

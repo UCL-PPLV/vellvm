@@ -5,25 +5,22 @@ LLVM compiler IR that is intended for _formal verification_ of
 LLVM-based software.  It is being developed at the
 University of Pennsylvania as part of the DeepSpec project.
 
-### See:
+See:
  - [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/)
  - [DeepSpec](http://deepspec.org)
  - [LLVM](http://llvm.org)
 
 # Participants
  - Steve Zdancewic
+ - Dmitri Garbuzov 
  - William Mansky
  - Christine Rizkallah
- - Olek Gierczak
- - Emmett Neyman
- - Robert Zajac
+ - Richard Zhang
 
 ## Past Contributors
  - Vivien Durey 
- - Dmitri Garbuzov 
  - Milo Martin
  - Santosh Nagarakatte 
- - Richard Zhang 
  - Jianzhou Zhao
 
 ---
@@ -38,26 +35,30 @@ University of Pennsylvania as part of the DeepSpec project.
 
 /src/doc - coqdoq  [not useful yet]
 
-/lib  - for 3rd party libraries [as git submodules]
+/lib  - for 3rd party libraries [separately installed]
+
+/lib/paco
 
 /tests - various LLVM source code tests
 
 # Installing / Compiling Vellvm
 
-### Assumes: 
-  - coqc   : version 8.7.1   (and coqdep, etc.)
-  - ocamlc : version 4.04  (probably works with 4.02 or later)
-  - OPAM packages: ocamlbuild, menhir, [optional: llvm  (for llvm v. 3.8)]
+Assumes:
+ - coqc   : version 8.6   (and coqdep, etc.)
+ - ocamlc : version 4.04  (probably works with 4.02 or later)
+ - OPAM packages: ocamlbuild, menhir, [optional: llvm  (for llvm v. 3.8)]
+ - paco  library  in /lib/paco   [available here](http://plv.mpi-sws.org/paco/)
+ - compcert 
+     - download CompCert 3.0.1 from http://compcert.inria.fr/download.html
+     - untar, rename to CompCert, and put in /vellvm/lib directory
+     - ./configure x86_64-macosx    [or whatever]
+     - make
 
 Compilation:
 
-1. clone the vellvm git repo with `--recursive` option (`git clone --recursive`)
-2. update CompCert submodule to coq 8.7.1 compatible version:
-   1. `cd lib/CompCert && git pull origin master`
-3. compile 3rd party libraries:
-   1. CompCert: `cd lib/Compcert && ./configure x86_64-macosx && make`
-   2. Compile Paco: `make -C lib/paco/src`
-4. run `make` in the /src directory
+1. clone the vellvm git repo
+2. install 3rd party libraries in /lib  (Paco and CompCert)
+3. run `make` in the /src directory
 
 # Running
 

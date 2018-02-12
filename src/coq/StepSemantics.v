@@ -9,15 +9,11 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import ZArith List String Omega.
-Require Coq.FSets.FMapAVL.
-Require Coq.FSets.FMapFacts.
-Require Coq.Structures.OrderedTypeEx.
-
 Require Import  Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.Ollvm_ast Vellvm.AstLib Vellvm.CFG.
 Import ListNotations.
 
-Require Import compcert.lib.Integers compcert.lib.Floats.
+Require Import compcert.lib.Integers.
 
 Open Scope Z_scope.
 Open Scope string_scope.
@@ -29,7 +25,6 @@ Require Import Vellvm.Effects.
 
 Module Type ADDR.
   Parameter addr : Set.
-  Parameter null : addr.
 End ADDR.  
 
 (* Set up for i1, i32, and i64 *) 
@@ -49,62 +44,44 @@ Definition inttyp (x:Z) : Type :=
   | _ => False
   end.
 
-Definition ll_float  := Floats.float32.
-Definition ll_double := Floats.float.
-
-
 Module StepSemantics(A:ADDR).
-  
-  (* The set of dynamic values manipulated by an LLVM program. *)
-  Inductive dvalue : Set :=
-  | DVALUE_CodePointer (p : instr_id)
-  | DVALUE_Addr (a:A.addr)
-  | DVALUE_I1 (x:int1)
-  | DVALUE_I32 (x:int32)
-  | DVALUE_I64 (x:int64)
-  | DVALUE_Double (x:ll_double)
-  | DVALUE_Float (x:ll_float)
-  | DVALUE_Undef (t:typ) (v:option value)
-  | DVALUE_Poison
-  | DVALUE_None
-  | DVALUE_Struct        (fields: list (typ * dvalue))
-  | DVALUE_Packed_struct (fields: list (typ * dvalue))
-  | DVALUE_Array         (elts: list (typ * dvalue))
-  | DVALUE_Vector        (elts: list (typ * dvalue))
-  .
 
-  Definition undef_i1  := (DVALUE_Undef (TYPE_I 1) None).
-  Definition undef_i32 := (DVALUE_Undef (TYPE_I 32) None).
-  Definition undef_i64 := (DVALUE_Undef (TYPE_I 64) None).
-    
+  (* The set of dynamic values manipulated by an LLVM program. This
+   datatype uses the "Expr" functor from the Ollvm_ast definition,
+   injecting new base values.  This allows the semantics to do
+   'symbolic' execution for things that we don't have a way of
+   interpreting concretely (e.g. undef).  *)
+    Inductive dvalue : Set :=
+    | DV : Expr dvalue -> dvalue
+    | DVALUE_CodePointer (p : instr_id)
+    | DVALUE_Addr (a:A.addr)
+    | DVALUE_I1 (x:int1)
+    | DVALUE_I32 (x:int32)
+    | DVALUE_I64 (x:int64)
+  (*| DVALUE_Double (x:ll_double)
+    | DVALUE_Float (x:ll_float)*)
+    | DVALUE_Poison
+    .
+  
     Module ET : Vellvm.Effects.EffT
-      with Definition addr := A.addr
-      with Definition typ := Ollvm_ast.typ
-      with Definition value := dvalue
-      with Definition ptr_int_type := int64.                                 
+        with Definition addr := A.addr
+        with Definition typ := Ollvm_ast.typ
+        with Definition value := dvalue.
 
       Definition addr := A.addr.
       Definition typ := Ollvm_ast.typ.
       Definition value := dvalue.
-      Definition ptr_int_type := int64.
       Definition inj_addr := DVALUE_Addr.
-      Definition inj_int := DVALUE_I64.
-      Definition no_value := DVALUE_None.
+      Definition no_value := DV (VALUE_None).
     End ET.    
   Module E := Vellvm.Effects.Effects(ET).
   Export E.
 
   (* TODO: add the global environment *)
-  Module ENV := FMapAVL.Make(AstLib.RawIDOrd).
-  Module ENVFacts := FMapFacts.WFacts_fun(AstLib.RawIDOrd)(ENV).
-  
-  Definition env_of_assoc {A} (l:list (raw_id * A)) : ENV.t A :=
-    List.fold_left (fun e '(k,v) => ENV.add k v e) l (@ENV.empty A).
-  
-  Definition genv := ENV.t value.
-  Definition env  := ENV.t value.
+  Definition genv := list (global_id * value).
+  Definition env  := list (local_id * value).
 
-  Inductive frame : Type :=
+  Inductive frame : Set :=
   | KRet      (e:env) (id:local_id) (q:pc)
   | KRet_void (e:env) (p:pc)
   .       
@@ -127,24 +104,25 @@ Module StepSemantics(A:ADDR).
     | ID_Local i => mret i
     end.
 
-  Fixpoint string_of_env' (e:list (raw_id * value)) : string :=
+  Fixpoint string_of_env' (e:env) : string :=
     match e with
     | [] => ""
     | (lid, _)::rest => (string_of_raw_id lid) ++ " " ++ (string_of_env' rest)
     end.
 
-  Instance string_of_env : StringOf env := fun env => string_of_env' (ENV.elements env).
+  Instance string_of_env : StringOf env := string_of_env'.
   
-  Definition lookup_env (e:env) (id:raw_id) : option dvalue :=
-    ENV.find id e.
+  Definition lookup_env (e:env) (id:raw_id) : option value :=
+    assoc RawID.eq_dec id e.
 
-  Definition add_env := ENV.add.
+  Definition add_env id dv (e:env) := (id,dv)::e.
   
   (* Arithmetic Operations ---------------------------------------------------- *)
+  (* TODO: implement LLVM semantics *)
 
   (* Since modules are not first class, this code duplication
      will probably have to do. *)
-  Definition eval_i1_op (iop:ibinop) (x y:inttyp 1) : dvalue:=
+  Definition eval_i1_op (iop:ibinop) (x y:inttyp 1) : value:=
     (* See eval_i64_op for a few comments *)
     match iop with
     | Add nuw nsw =>
@@ -159,7 +137,7 @@ Module StepSemantics(A:ADDR).
       (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
       DVALUE_I1 (Int1.mul x y)
     | Shl nuw nsw =>
-      if (Int1.unsigned y) >=? 1 then undef_i1 else DVALUE_I1 x
+      if (Int1.unsigned y) >=? 1 then DV (VALUE_Undef) else DVALUE_I1 x
     | UDiv ex =>
       if andb ex (negb ((Int1.unsigned x) mod (Int1.unsigned y) =? 0))
       then DVALUE_Poison else DVALUE_I1 (Int1.divu x y)
@@ -168,9 +146,9 @@ Module StepSemantics(A:ADDR).
       if andb ex (negb (((Int1.signed x) mod (Int1.signed y)) =? 0))
       then DVALUE_Poison else DVALUE_I1 (Int1.divs x y)
     | LShr ex =>
-      if (Int1.unsigned y) >=? 1 then undef_i1 else DVALUE_I1 x
+      if (Int1.unsigned y) >=? 1 then DV (VALUE_Undef) else DVALUE_I1 x
     | AShr ex =>
-      if (Int1.unsigned y) >=? 1 then undef_i1 else DVALUE_I1 x
+      if (Int1.unsigned y) >=? 1 then DV (VALUE_Undef) else DVALUE_I1 x
     | URem =>
       DVALUE_I1 (Int1.modu x y)
     | SRem =>
@@ -185,7 +163,7 @@ Module StepSemantics(A:ADDR).
   Arguments eval_i1_op _ _ _ : simpl nomatch.
 
   
-  Definition eval_i32_op (iop:ibinop) (x y:inttyp 32) : dvalue:=
+  Definition eval_i32_op (iop:ibinop) (x y:inttyp 32) : value:=
     match iop with
     | Add nuw nsw =>
       if orb (andb nuw (Int32.eq (Int32.add_carry x y Int32.zero) Int32.one))
@@ -207,7 +185,7 @@ Module StepSemantics(A:ADDR).
       let res := Int32.shl x y in
       let res_u := Int32.unsigned res in
       let res_u' := Z.shiftl (Int32.unsigned x) (Int32.unsigned y) in
-      if (Int32.unsigned y) >=? 32 then undef_i32
+      if (Int32.unsigned y) >=? 32 then DV (VALUE_Undef) 
       else if orb (andb nuw (res_u' >? res_u))
                   (andb nsw (negb (Z.shiftr (Int32.unsigned x)
                                             (32 - Int32.unsigned y)
@@ -221,12 +199,12 @@ Module StepSemantics(A:ADDR).
       if andb ex (negb (((Int32.signed x) mod (Int32.signed y)) =? 0))
       then DVALUE_Poison else DVALUE_I32 (Int32.divs x y)
     | LShr ex =>
-      if (Int32.unsigned y) >=? 32 then undef_i32
+      if (Int32.unsigned y) >=? 32 then DV (VALUE_Undef)
       else if andb ex (negb ((Int32.unsigned x)
                                mod (Z.pow 2 (Int32.unsigned y)) =? 0))
       then DVALUE_Poison else DVALUE_I32 (Int32.shru x y)
     | AShr ex =>
-      if (Int32.unsigned y) >=? 32 then undef_i32
+      if (Int32.unsigned y) >=? 32 then DV (VALUE_Undef)
       else if andb ex (negb ((Int32.unsigned x)
                                mod (Z.pow 2 (Int32.unsigned y)) =? 0))
       then DVALUE_Poison else DVALUE_I32 (Int32.shr x y)
@@ -243,7 +221,7 @@ Module StepSemantics(A:ADDR).
     end.
   Arguments eval_i32_op _ _ _ : simpl nomatch.
   
-  Definition eval_i64_op (iop:ibinop) (x y:inttyp 64) : dvalue:=
+  Definition eval_i64_op (iop:ibinop) (x y:inttyp 64) : value:=
     (* This needs to be tested *)
     match iop with
     (* Following to cases are probably right since they use CompCert *)
@@ -269,7 +247,7 @@ Module StepSemantics(A:ADDR).
       let res_u' := Z.shiftl (Int64.unsigned x) (Int64.unsigned y) in
       (* Unsigned shift x right by 64 - y. If shifted x != sign bit * (2^y - 1),
          then there is overflow. *)
-      if (Int64.unsigned y) >=? 64 then undef_i64
+      if (Int64.unsigned y) >=? 64 then DV (VALUE_Undef) 
       else if orb (andb nuw (res_u' >? res_u))
                   (andb nsw (negb (Z.shiftr (Int64.unsigned x)
                                             (64 - Int64.unsigned y)
@@ -283,12 +261,12 @@ Module StepSemantics(A:ADDR).
       if andb ex (negb (((Int64.signed x) mod (Int64.signed y)) =? 0))
       then DVALUE_Poison else DVALUE_I64 (Int64.divs x y)
     | LShr ex =>
-      if (Int64.unsigned y) >=? 64 then undef_i64
+      if (Int64.unsigned y) >=? 64 then DV (VALUE_Undef)
       else if andb ex (negb ((Int64.unsigned x)
                                mod (Z.pow 2 (Int64.unsigned y)) =? 0))
       then DVALUE_Poison else DVALUE_I64 (Int64.shru x y)
     | AShr ex =>
-      if (Int64.unsigned y) >=? 64 then undef_i64
+      if (Int64.unsigned y) >=? 64 then DV (VALUE_Undef)
       else if andb ex (negb ((Int64.unsigned x)
                                mod (Z.pow 2 (Int64.unsigned y)) =? 0))
       then DVALUE_Poison else DVALUE_I64 (Int64.shr x y)
@@ -306,7 +284,7 @@ Module StepSemantics(A:ADDR).
   Arguments eval_i64_op _ _ _ : simpl nomatch.
   
   (* Evaluate the given iop on the given arguments according to the bitsize *)
-  Definition integer_op (bits:Z) (iop:ibinop) (x y:inttyp bits) : err dvalue:=
+  Definition integer_op (bits:Z) (iop:ibinop) (x y:inttyp bits) : err value:=
     match bits, x, y with
     | 1, x, y => mret (eval_i1_op iop x y)
     | 32, x, y => mret (eval_i32_op iop x y)
@@ -348,20 +326,48 @@ Module StepSemantics(A:ADDR).
     | _, _, _ => failwith "ill_typed-iop"
     end.
   Arguments eval_iop_integer_h _ _ _ _ : simpl nomatch.
-
+  
+  (* Handles the written constant cases for ops *)
+  Definition eval_bop_integer t op v1 v2 : err value :=
+    match t, v1, v2 with
+    | TYPE_I bits, DV (VALUE_Integer i1), DV (VALUE_Integer i2) =>
+      'v1 <- coerce_integer_to_int bits i1;
+      'v2 <- coerce_integer_to_int bits i2;
+      op t v1 v2
+    | TYPE_I bits, DV (VALUE_Integer i1),v2 =>
+      'v1 <- coerce_integer_to_int bits i1;
+      op t v1 v2
+    | TYPE_I bits, v1, DV (VALUE_Integer i2) =>
+      'v2 <- coerce_integer_to_int bits i2;
+      op t v1 v2
+    | _,  v1, v2 => op t v1 v2
+    end.
+  Arguments eval_bop_integer _ _ _ _ : simpl nomatch.
+  
   (* I split the definition between the vector and other evaluations because
      otherwise eval_iop should be recursive to allow for vector calculations, 
      but coq can't find a fixpoint. *)
   Definition eval_iop t iop v1 v2 : err value :=
     match t, v1, v2 with
-    | TYPE_Vector s (TYPE_I i), (DVALUE_Vector elts1), (DVALUE_Vector elts2) =>
-      'val <- vec_loop (eval_iop_integer_h (TYPE_I i) iop) (List.combine elts1 elts2);
-      mret (DVALUE_Vector val)
-    | _, _, _ => eval_iop_integer_h t iop v1 v2
+    | TYPE_Vector s (TYPE_I 1), DV (VALUE_Vector elts1), DV (VALUE_Vector elts2)
+    | TYPE_Vector s (TYPE_I 32), DV (VALUE_Vector elts1), DV (VALUE_Vector elts2)
+    | TYPE_Vector s (TYPE_I 64), DV (VALUE_Vector elts1), DV (VALUE_Vector elts2) =>
+      'val <- vec_loop (eval_bop_integer t (fun t => eval_iop_integer_h t iop))
+           (List.combine elts1 elts2);
+      mret (DV (VALUE_Vector val))
+    | _, _, _ => (eval_bop_integer t (fun t => eval_iop_integer_h t iop)) v1 v2
     end.
   Arguments eval_iop _ _ _ _ : simpl nomatch.
 
 
+  Definition cast_boolean_literal_if_needed (v : dvalue) : err value :=
+    match v with
+    | DV (VALUE_Bool true) => mret (DVALUE_I1 Int1.one)
+    | DV (VALUE_Bool false) => mret (DVALUE_I1 Int1.zero)
+    | DV _ => failwith "Not a castable boolean"
+    | _ => mret v
+    end.
+  
   Definition eval_i1_icmp icmp x y : value :=
     if match icmp with
        | Eq => Int1.cmp Ceq x y
@@ -378,7 +384,7 @@ Module StepSemantics(A:ADDR).
     then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
   Arguments eval_i1_icmp _ _ _ : simpl nomatch.
   
-  Definition eval_i32_icmp icmp x y : dvalue :=
+  Definition eval_i32_icmp icmp x y : value :=
     if match icmp with
        | Eq => Int32.cmp Ceq x y
        | Ne => Int32.cmp Cne x y
@@ -394,7 +400,7 @@ Module StepSemantics(A:ADDR).
     then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
   Arguments eval_i32_icmp _ _ _ : simpl nomatch.
   
-  Definition eval_i64_icmp icmp x y : dvalue :=
+  Definition eval_i64_icmp icmp x y : value :=
     if match icmp with
        | Eq => Int64.cmp Ceq x y
        | Ne => Int64.cmp Cne x y
@@ -419,16 +425,20 @@ Module StepSemantics(A:ADDR).
     end.
   Arguments integer_cmp _ _ _ _ : simpl nomatch.
   
-  Definition eval_icmp t icmp v1 v2 : err dvalue :=
+  (*Helper defined in order to prevent 
+    eval_icmp from being recursive. *)
+  Definition eval_icmp_h t icmp v1 v2 : err value :=
     match t, v1, v2 with
     | TYPE_I 1, DVALUE_I1 i1, DVALUE_I1 i2 => integer_cmp 1 icmp i1 i2
     | TYPE_I 32, DVALUE_I32 i1, DVALUE_I32 i2 => integer_cmp 32 icmp i1 i2
     | TYPE_I 64, DVALUE_I64 i1, DVALUE_I64 i2 => integer_cmp 64 icmp i1 i2
     | _, _, _ => failwith "ill_typed-icmp"
     end.
-  Arguments eval_icmp _ _ _ _ : simpl nomatch.
-
-
+  Arguments eval_icmp_h _ _ _ _ : simpl nomatch.
+  
+  Definition eval_icmp t icmp v1 v2 : err value :=
+    eval_bop_integer t (fun t => eval_icmp_h t icmp) v1 v2.
+  (*
   Definition double_op (fop:fbinop) (v1:ll_double) (v2:ll_double) : err value :=
     match fop with
     | FAdd => mret (DVALUE_Double (Float.add v1 v2))
@@ -445,80 +455,24 @@ Module StepSemantics(A:ADDR).
     | FMul => mret (DVALUE_Float (Float32.mul v1 v2))
     | FDiv => mret (DVALUE_Float (Float32.div v1 v2))
     | FRem => failwith "unimplemented"
-    end.
+    end.*)
   
-  Definition eval_fop (t:typ) (fop:fbinop) (v1:value) (v2:value) : err dvalue :=
+  Definition eval_fop (t:typ) (fop:fbinop) (v1:value) (v2:value) : err value :=
+    (* This can be revisited. Ollvm_ast.v needs to be updated. 
     match t, v1, v2 with
+    | TYPE_Float, DV (VALUE_Float f1), DV (VALUE_Float f2) =>
+      
     | TYPE_Float, DVALUE_Float f1, DVALUE_Float f2 => float_op fop f1 f2
+    | TYPE_Double, DV (VALUE_Float d1), DV (VALUE_Float d2) =>
+      
     | TYPE_Double, DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
     | _, _, _ => failwith "ill_typed-fop"
-    end. 
+    end. *)
+    failwith "unimplemented".
 
-  Definition not_nan32 (f:ll_float) : bool :=
-    negb (compcert.flocq.Appli.Fappli_IEEE.is_nan _ _ f). 
+  Definition eval_fcmp (fcmp:fcmp) (v1:value) (v2:value) : err value := failwith "eval_fcmp not implemented".
 
-  Definition ordered32 (f1 f2:ll_float) : bool :=
-    andb (not_nan32 f1) (not_nan32 f2).
-
-  Definition not_nan64 (f:ll_double) : bool :=
-    negb (compcert.flocq.Appli.Fappli_IEEE.is_nan _ _ f). 
-
-  Definition ordered64 (f1 f2:ll_double) : bool :=
-    andb (not_nan64 f1) (not_nan64 f2).
-  
-  Definition float_cmp (fcmp:fcmp) (x:ll_float) (y:ll_float) : dvalue :=
-    if match fcmp with
-       | FFalse => false
-       | FOeq => andb (ordered32 x y) (Float32.cmp Ceq x y)
-       | FOgt => andb (ordered32 x y) (Float32.cmp Cgt x y)
-       | FOge => andb (ordered32 x y) (Float32.cmp Cge x y)
-       | FOlt => andb (ordered32 x y) (Float32.cmp Clt x y)
-       | FOle => andb (ordered32 x y) (Float32.cmp Cle x y)
-       | FOne => andb (ordered32 x y) (Float32.cmp Cne x y)
-       | FOrd => ordered32 x y
-       | FUno => negb (ordered32 x y)
-       | FUeq => (Float32.cmp Ceq x y)
-       | FUgt => (Float32.cmp Cgt x y)
-       | FUge => (Float32.cmp Cge x y)
-       | FUlt => (Float32.cmp Clt x y)
-       | FUle => (Float32.cmp Cle x y)
-       | FUne => (Float32.cmp Cne x y)
-       | FTrue => true
-       end
-    then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
-  Arguments float_cmp _ _ _ : simpl nomatch.
-
-  Definition double_cmp (fcmp:fcmp) (x:ll_double) (y:ll_double) : dvalue :=
-    if match fcmp with
-       | FFalse => false
-       | FOeq => andb (ordered64 x y) (Float.cmp Ceq x y)
-       | FOgt => andb (ordered64 x y) (Float.cmp Cgt x y)
-       | FOge => andb (ordered64 x y) (Float.cmp Cge x y)
-       | FOlt => andb (ordered64 x y) (Float.cmp Clt x y)
-       | FOle => andb (ordered64 x y) (Float.cmp Cle x y)
-       | FOne => andb (ordered64 x y) (Float.cmp Cne x y)
-       | FOrd => ordered64 x y
-       | FUno => negb (ordered64 x y)
-       | FUeq => (Float.cmp Ceq x y)
-       | FUgt => (Float.cmp Cgt x y)
-       | FUge => (Float.cmp Cge x y)
-       | FUlt => (Float.cmp Clt x y)
-       | FUle => (Float.cmp Cle x y)
-       | FUne => (Float.cmp Cne x y)
-       | FTrue => true
-       end
-    then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
-    Arguments double_cmp _ _ _ : simpl nomatch.
-  
-  Definition eval_fcmp (fcmp:fcmp) (v1:value) (v2:value) : err value :=
-    match v1, v2 with
-    | DVALUE_Float f1, DVALUE_Float f2 => mret (float_cmp fcmp f1 f2)
-    | DVALUE_Double f1, DVALUE_Double f2 => mret (double_cmp fcmp f1 f2)
-    | _, _ => failwith "ill_typed-fcmp"
-    end.
-    
-
-  Definition eval_conv_h conv t1 x t2 : err dvalue :=
+  Definition eval_conv_h conv t1 x t2 : err value :=
     match conv with
     | Trunc =>
       match t1, x, t2 with
@@ -558,22 +512,23 @@ Module StepSemantics(A:ADDR).
         mret (DVALUE_Addr a) 
       | _, _, _ => failwith "ill-typed_conv"
       end
+    | Inttoptr
+    | Ptrtoint
     | Fptrunc
     | Fpext
     | Uitofp
     | Sitofp
     | Fptoui
-    | Fptosi => failwith "TODO: floating point conversion not yet implemented"
-    | Inttoptr
-    | Ptrtoint => failwith "nested Inttoptr or Ptrtoint unsupported"
+    | Fptosi => failwith "unimplemented conv"
     end.
   Arguments eval_conv_h _ _ _ _ : simpl nomatch.
   
-  Definition eval_conv conv t1 x t2 : err dvalue :=
+  Definition eval_conv conv t1 x t2 : err value :=
     match t1, x with
-    | TYPE_I bits, dv =>
-        eval_conv_h conv t1 dv t2
-    | TYPE_Vector s t, (DVALUE_Vector elts) =>
+    | TYPE_I bits, DV (VALUE_Integer x) =>
+      'v <- coerce_integer_to_int bits x;
+        eval_conv_h conv t1 v t2
+    | TYPE_Vector s t, DV (VALUE_Vector elts) =>
       (* In the future, implement bitcast and etc with vectors *)
       failwith "vectors unimplemented"
     | _, _ => eval_conv_h conv t1 x t2
@@ -582,7 +537,7 @@ Module StepSemantics(A:ADDR).
 
   
   (* Same deal as above with the helper *)
-  Definition eval_select_h cnd v1 v2 : err dvalue :=
+  Definition eval_select_h cnd v1 v2 : err value :=
     match cnd with
     | DVALUE_I1 i =>
       mret (if Int1.unsigned i =? 1 then v1 else v2)
@@ -591,10 +546,10 @@ Module StepSemantics(A:ADDR).
   Arguments eval_select_h _ _ _ : simpl nomatch.
 
   
-  Definition eval_select t cnd t' v1 v2 : err dvalue :=
+  Definition eval_select t cnd t' v1 v2 : err value :=
     match t, t', cnd, v1, v2 with
-    | TYPE_Vector _ t, TYPE_Vector _ t', (DVALUE_Vector es),
-      (DVALUE_Vector es1), (DVALUE_Vector es2) =>
+    | TYPE_Vector _ t, TYPE_Vector _ t', DV (VALUE_Vector es),
+      DV (VALUE_Vector es1), DV (VALUE_Vector es2) =>
       (* vec needs to loop over es, es1, and es2. Is there a way to
          generalize vec_loop to cover this? (make v1,v2 generic?) *)
       let fix loop elts := 
@@ -609,14 +564,14 @@ Module StepSemantics(A:ADDR).
             end
           end in
       'val <- loop (List.combine es (List.combine es1 es2));
-      mret (DVALUE_Vector val)
+      mret (DV (VALUE_Vector val))
     | _, _, _, _, _ => eval_select_h cnd v1 v2
     end.
   Arguments eval_select _ _ _ _ _ : simpl nomatch.
   
-  (* Helper function for indexing into a structured datatype 
+  (* Helper function for indexding into a structured datatype 
      for extractvalue and insertvalue *)
-  Definition index_into_str (v:value) (idx:Ollvm_ast.int) : err (typ * dvalue) :=
+  Definition index_into_str (v:value) (idx:Ollvm_ast.int) : err (typ * value) :=
     let fix loop elts i :=
         match elts with
         | [] => failwith "index out of bounds"
@@ -624,14 +579,15 @@ Module StepSemantics(A:ADDR).
           if idx =? 0 then mret h else loop tl (i-1)
         end in
     match v with
-    | DVALUE_Struct f => loop f idx
-    | DVALUE_Array e => loop e idx
+    | DV (VALUE_Struct f) => loop f idx
+    | DV (VALUE_Array e) => loop e idx
     | _ => failwith "invalid aggregate data"
     end.
   Arguments index_into_str _ _ : simpl nomatch.
   
-  (* Helper function for inserting into a structured datatype for insertvalue *)
-  Definition insert_into_str (str:value) (v:value) (idx:Ollvm_ast.int) : err dvalue :=
+  (* Helper function for indexding into a structured datatype 
+     for insertvalue *)
+  Definition insert_into_str (str:value) (v:value) (idx:Ollvm_ast.int) : err value :=
     let fix loop (acc elts:list (typ * value)) (i:Ollvm_ast.int) :=
         match elts with
         | [] => failwith "index out of bounds"
@@ -640,166 +596,103 @@ Module StepSemantics(A:ADDR).
           else loop (app acc [pair t h]) tl (i-1)
         end in
     match str with
-    | DVALUE_Struct f =>
+    | DV (VALUE_Struct f) =>
       'v <- (loop [] f idx);
-      mret (DVALUE_Struct v)
-
-    | DVALUE_Array e =>
+      mret (DV (VALUE_Struct v))
+    | DV (VALUE_Array e) =>
       'v <- (loop [] e idx);
-      mret (DVALUE_Array v)
-
+      mret (DV (VALUE_Array v))
     | _ => failwith "invalid aggregate data"
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
-
-
-  Definition dv_zero_initializer (t:typ) : err dvalue :=
-    failwith "dv_zero_initializer unimplemented".
-
-  Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
-    match l1, l2 with
-    | [], [] => mret []
-    | x::xs, y::ys =>
-      'l <- combine_lists_err xs ys;
-        mret ((x,y)::l)
-    | _, _ => failwith "combine_lists_err: different lenth lists"
-    end.
   
-(*
-  [eval_expr] is the main entry point for evaluating LLVM expressions.
-  top : is the type at which the expression should be evaluated (if any)
-  INVARIANT: 
-    - top my be None only for Ollvm_ast.OP_* cases
-    - top must be Some t for Ollvm_ast.VALUE_* cases
-*)
-Fixpoint eval_expr (e:env) (top:option typ) (o:Ollvm_ast.value) : err dvalue :=
+Definition eval_expr {A:Set} (f:env -> option typ -> A -> err value) (e:env) (top:option typ) (o:Expr A) : err value :=
   match o with
-  | Ollvm_ast.VALUE_Ident id => 
+  | VALUE_Ident id => 
     'i <- local_id_of_ident id;
       match lookup_env e i with
       | None => failwith ("lookup_env: id = " ++ (string_of i) ++ " NOT IN env = " ++ (string_of e))
       | Some v => mret v
       end
-
-  | Ollvm_ast.VALUE_Integer x =>
+  | VALUE_Integer x =>
     match top with
-    | None =>  failwith "eval_expr given untyped VALUE_Integer"
+    | None =>  mret (DV (VALUE_Integer x))
     | Some (TYPE_I bits) => coerce_integer_to_int bits x
     | _ => failwith "bad type for constant int"
     end
+  | VALUE_Float x   => mret (DV (VALUE_Float x))
+  | VALUE_Bool b    => mret (DV (VALUE_Bool b)) 
+  | VALUE_Null      => mret (DV (VALUE_Null))
+  | VALUE_Zero_initializer => mret (DV (VALUE_Zero_initializer))
+  | VALUE_Cstring s => mret (DV (VALUE_Cstring s))
+  | VALUE_None      => mret (DV (VALUE_None))
+  | VALUE_Undef     => mret (DV (VALUE_Undef))
 
-  | Ollvm_ast.VALUE_Float x   =>
-    match top with
-    | None => failwith "eval_expr given untyped VALUE_Float"
-    | Some TYPE_Float  =>  mret (DVALUE_Float (Float32.of_double x))
-    | Some TYPE_Double =>  mret (DVALUE_Double x)
-    | _ => failwith "bad type for constant float"
-    end
+  | VALUE_Struct es =>
+    'vs <- map_monad (monad_app_snd (f e top)) es;
+     mret (DV (VALUE_Struct vs))
 
-  | Ollvm_ast.VALUE_Hex x     =>
-    match top with
-    | None => failwith "eval_expr given untyped VALUE_Hex"
-    | Some TYPE_Float  =>  mret (DVALUE_Float (Float32.of_double x))
-    | Some TYPE_Double =>  mret (DVALUE_Double x)
-    | _ => failwith "bad type for constant hex float"
-    end
-
-  | Ollvm_ast.VALUE_Bool b    =>
-    match b with
-    | true => mret (DVALUE_I1 Int1.one)
-    | false => mret (DVALUE_I1 Int1.zero)
-    end
-
-  | Ollvm_ast.VALUE_Null      => mret (DVALUE_Addr A.null)
-
-  | Ollvm_ast.VALUE_Zero_initializer =>
-    match top with
-    | None => failwith "eval_expr given untyped VALUE_Zero_initializer"
-    | Some t => dv_zero_initializer t
-    end
-
-  | Ollvm_ast.VALUE_Cstring s =>
-    failwith "VALUE_Cstring not yet implemented"
-
-  | Ollvm_ast.VALUE_Undef     =>
-    match top with
-    | None => failwith "eval_expr given untyped VALUE_Undef"
-    | Some t => mret (DVALUE_Undef t None)
-    end
-
-  (* Question: should we do any typechecking for aggregate types here? *)
-  (* Option 1: do no typechecking: *)
-  | Ollvm_ast.VALUE_Struct es =>
-      'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) es;
-      mret (DVALUE_Struct vs)
-
-  (* Option 2: do a little bit of typechecking *)
-  | Ollvm_ast.VALUE_Packed_struct es =>
-    match top with
-    | None => failwith "eval_expr given untyped VALUE_Struct"
-    | Some (TYPE_Packed_struct _) =>
-      'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) es;
-      mret (DVALUE_Packed_struct vs)
-    | _ => failwith "bad type for VALUE_Packed_struct"
-    end
-
-  | Ollvm_ast.VALUE_Array es =>
-    'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) es;    
-     mret (DVALUE_Array vs)
+  | VALUE_Packed_struct es =>
+    'vs <- map_monad (monad_app_snd (f e top)) es;
+     mret (DV (VALUE_Packed_struct vs))
     
-  | Ollvm_ast.VALUE_Vector es =>
-    'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) es;        
-     mret (DVALUE_Vector vs)
+  | VALUE_Array es =>
+    'vs <- map_monad (monad_app_snd (f e top)) es;
+     mret (DV (VALUE_Array vs))
+    
+  | VALUE_Vector es =>
+    'vs <- map_monad (monad_app_snd (f e top)) es;
+     mret (DV (VALUE_Vector vs))
 
-  | Ollvm_ast.OP_IBinop iop t op1 op2 =>
-    'v1 <- eval_expr e (Some t) op1;
-    'v2 <- eval_expr e (Some t) op2;
+  | OP_IBinop iop t op1 op2 =>
+    'v1 <- f e (Some t) op1;
+    'v2 <- f e (Some t) op2;
     (eval_iop t iop) v1 v2
 
-  | Ollvm_ast.OP_ICmp cmp t op1 op2 => 
-    'v1 <- eval_expr e (Some t) op1;                   
-    'v2 <- eval_expr e (Some t) op2;
+  | OP_ICmp cmp t op1 op2 => 
+    'v1 <- f e (Some t) op1;                   
+    'v2 <- f e (Some t) op2;
     (eval_icmp t cmp) v1 v2
 
-  | Ollvm_ast.OP_FBinop fop fm t op1 op2 =>
-    'v1 <- eval_expr e (Some t) op1;
-    'v2 <- eval_expr e (Some t) op2;
+  | OP_FBinop fop fm t op1 op2 =>
+    'v1 <- f e (Some t) op1;
+    'v2 <- f e (Some t) op2;
     (eval_fop t fop) v1 v2
 
-  | Ollvm_ast.OP_FCmp fcmp t op1 op2 => 
-    'v1 <- eval_expr e (Some t) op1;
-    'v2 <- eval_expr e (Some t) op2;
+  | OP_FCmp fcmp t op1 op2 => 
+    'v1 <- f e (Some t) op1;
+    'v2 <- f e (Some t) op2;
     (eval_fcmp fcmp) v1 v2
               
-  | Ollvm_ast.OP_Conversion conv t1 op t2 =>
-    'v <- eval_expr e (Some t1) op;
+  | OP_Conversion conv t1 op t2 =>
+    'v <- f e (Some t1) op;
     (eval_conv conv) t1 v t2
                        
-  | Ollvm_ast.OP_GetElementPtr t (ptrtyp, ptrval) idxs =>
-    'vptr <- eval_expr e (Some ptrtyp) ptrval;
-      'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) idxs;              
-      failwith "getelementptr not implemented"  (* TODO: Getelementptr *)  
+  | OP_GetElementPtr t ptrval idxs =>
+    'vptr <- monad_app_snd (f e (Some t) ) ptrval;
+    'vs <- map_monad (monad_app_snd (f e (Some (TYPE_I 32)))) idxs;
+    failwith "getelementptr not implemented"  (* TODO: Getelementptr *)  
     
-  | Ollvm_ast.OP_ExtractElement vecop idx =>
-    (*    'vec <- monad_app_snd (eval_expr e) vecop;
-    'vidx <- monad_app_snd (eval_expr e) idx;  *)
+  | OP_ExtractElement vecop idx =>
+(*    'vec <- monad_app_snd (f e) vecop;
+    'vidx <- monad_app_snd (f e) idx;  *)
     failwith "extractelement not implemented" (* TODO: Extract Element *) 
       
-  | Ollvm_ast.OP_InsertElement vecop eltop idx =>
-(*    'vec <- monad_app_snd (eval_expr e) vecop;
-    'v <- monad_app_snd (eval_expr e) eltop;
-    'vidx <- monad_app_snd (eval_expr e) idx; *)
+  | OP_InsertElement vecop eltop idx =>
+(*    'vec <- monad_app_snd (f e) vecop;
+    'v <- monad_app_snd (f e) eltop;
+    'vidx <- monad_app_snd (f e) idx; *)
     failwith "insertelement not implemented" (* TODO *)
     
-  | Ollvm_ast.OP_ShuffleVector vecop1 vecop2 idxmask =>
-(*    'vec1 <- monad_app_snd (eval_expr e) vecop1;
-    'vec2 <- monad_app_snd (eval_expr e) vecop2;      
-    'vidx <- monad_app_snd (eval_expr e) idxmask; *)
+  | OP_ShuffleVector vecop1 vecop2 idxmask =>
+(*    'vec1 <- monad_app_snd (f e) vecop1;
+    'vec2 <- monad_app_snd (f e) vecop2;      
+    'vidx <- monad_app_snd (f e) idxmask; *)
     failwith "shufflevector not implemented" (* TODO *)
 
-  | Ollvm_ast.OP_ExtractValue strop idxs =>
+  | OP_ExtractValue strop idxs =>
     let '(t, str) := strop in
-    'str <- eval_expr e (Some t) str;
+    'str <- f e (Some t) str;
     let fix loop str idxs : err dvalue :=
         match idxs with
         | [] => mret str
@@ -809,10 +702,10 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:Ollvm_ast.value) : err dvalue :=
         end in
     loop str idxs
         
-  | Ollvm_ast.OP_InsertValue strop eltop idxs =>
+  | OP_InsertValue strop eltop idxs =>
     (*
-    '(t1, str) <- monad_app_snd (eval_expr e) strop;
-    '(t2, v) <- monad_app_snd (eval_expr e) eltop;
+    '(t1, str) <- monad_app_snd (f e) strop;
+    '(t2, v) <- monad_app_snd (f e) eltop;
     let fix loop str idxs : err dvalue :=
         match idxs with
         | [] => failwith "invalid indices"
@@ -826,18 +719,22 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:Ollvm_ast.value) : err dvalue :=
     loop str idxs*)
     failwith "TODO"
     
-  | Ollvm_ast.OP_Select (t, cnd) (t1, op1) (t2, op2) => 
-    'cndv <- eval_expr e (Some t) cnd;
-    'v1 <- eval_expr e (Some t1) op1;
-    'v2 <- eval_expr e (Some t2) op2;
-    eval_select t cndv t1 v1 v2
+  | OP_Select cndop op1 op2 => (* Do this *)
+    (*
+    '(t, cnd) <- monad_app_snd (f e) cndop;
+    '(t1, v1) <- monad_app_snd (f e) op1;
+    '(t2, v2) <- monad_app_snd (f e) op2;
+    eval_select t cnd t1 v1 v2
+     *)
+    failwith "TODO"
   end.
-Arguments eval_expr _ _ _ : simpl nomatch.
+Arguments eval_expr _ _ _ _ _ : simpl nomatch.
 
-Fixpoint eval_op (e:env) (o:Ollvm_ast.value) : err dvalue :=
-  eval_expr e None o.
-
-Arguments eval_op _ _ : simpl nomatch.
+Fixpoint eval_op (e:env) (top:option typ) (o:Ollvm_ast.value) : err value :=
+  match o with
+  | SV o' => eval_expr eval_op e top o'
+  end.
+Arguments eval_op _ _ _ : simpl nomatch.
 
 (*
 Definition eval_op_for_store (e:env) (t:typ) (o:Ollvm_ast.value)
@@ -848,6 +745,7 @@ Definition eval_op_for_store (e:env) (t:typ) (o:Ollvm_ast.value)
     | TYPE_I 1, VALUE_Integer i => mret (DVALUE_I1 (Int1.repr i))
     | TYPE_I 32, VALUE_Integer i => mret (DVALUE_I32 (Int32.repr i))
     | TYPE_I 64, VALUE_Integer i => mret (DVALUE_I64 (Int64.repr i))
+
     | _, OP_IBinop _ _ _ _
     | _, OP_ICmp _ _ _ _
     | _, OP_FBinop _ _ _ _ _
@@ -864,12 +762,14 @@ Definition eval_op_for_store (e:env) (t:typ) (o:Ollvm_ast.value)
     | _, _ => eval_op e (Some t) o
     end
   end.
+
 Definition eval_cond (e:env) (o:Ollvm_ast.value) : err value :=
   match o with
   | SV o' =>
     match o' with
     | VALUE_Bool true => mret (DVALUE_I1 (Int1.one))
     | VALUE_Bool false => mret (DVALUE_I1 (Int1.zero))
+
     | OP_IBinop _ _ _ _
     | OP_ICmp _ _ _ _
     | OP_FBinop _ _ _ _ _
@@ -882,6 +782,7 @@ Definition eval_cond (e:env) (o:Ollvm_ast.value) : err value :=
     | OP_ExtractValue _ _
     | OP_InsertValue _ _ _
     | OP_Select _ _ _ => failwith "invalid conditional"
+
     | _ => eval_op e None o
     end
   end.
@@ -896,7 +797,7 @@ Fixpoint jump (CFG:cfg) (from:block_id) (e_init:env) (e:env) (to:block) (k:stack
   match ps with
   | [] => mret (q, e, k)
   | (id, (INSTR_Phi _ ls))::rest => 
-    match assoc RawIDOrd.eq_dec bn ls with
+    match assoc RawID.eq_dec bn ls with
     | Some op =>
       'dv <- eval_op e_init op;
       jump CFG bn e_init (add_env id dv e) rest q k
@@ -906,12 +807,29 @@ Fixpoint jump (CFG:cfg) (from:block_id) (e_init:env) (e:env) (to:block) (k:stack
   end.
 *)
 
+Locate find_block_entry.
+Definition test iid e e_init t ls bid_src :=
+      match assoc RawID.eq_dec bid_src ls with
+      | Some op =>
+        'dv <- eval_op e_init (Some t) op;
+          mret (add_env iid dv e)
+      | None => failwith ("jump: block " ++ string_of bid_src ++ " not found in " ++ string_of iid)
+      end.
+Print test. Print monad_fold_right.
 
+
+
+
+
+
+
+
+Print RawID.eq_dec.
 Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (e_init:env) (k:stack)  : err state :=
   let eval_phi (e:env) '(iid, Phi t ls) :=
-      match assoc RawIDOrd.eq_dec bid_src ls with
+      match assoc RawID.eq_dec bid_src ls with
       | Some op =>
-        'dv <- eval_expr e_init (Some t) op;
+        'dv <- eval_op e_init (Some t) op;
           mret (add_env iid dv e)
       | None => failwith ("jump: block " ++ string_of bid_src ++ " not found in " ++ string_of iid)
       end
@@ -954,7 +872,7 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
   do cmd <- trywith ("CFG has no instruction at " ++ string_of pc) (fetch CFG pc);
   match cmd with
   | Term (TERM_Ret (t, op)) =>
-    do dv <- eval_expr e (Some t) op;
+    do dv <- eval_op e (Some t) op;
       match k with
       | [] => Obs (Fin dv)
       | (KRet e' id p') :: k' => Jump (p', add_env id dv e', k')
@@ -963,13 +881,13 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
 
   | Term TERM_Ret_void =>
     match k with
-    | [] => Obs (Fin (DVALUE_None))
+    | [] => Obs (Fin (DV (VALUE_Bool true)))
     | (KRet_void e' p')::k' => Jump (p', e', k')
     | _ => t_raise_p pc "IMPOSSIBLE: Ret void in non-return configuration"
     end
           
   | Term (TERM_Br (t,op) br1 br2) =>
-    do dv <- eval_expr e (Some t) op; (* TO SEE *)
+    do dv <- eval_op e (Some t) op; (* TO SEE *)
       do br <- match dv with 
               (* CHKoh: | DV (VALUE_Bool true) => mret br1
                  | DV (VALUE_Bool false) => mret br2 *)
@@ -998,53 +916,24 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
   | CFG.Step insn =>  (* instruction *)
     do pc_next <- trywith "no fallthrough intsruction" (incr_pc CFG pc);
       match (pt pc), insn  with
-
-      (* operations that interact with the memory model - they generate effects *)
-        
-      | IId id, INSTR_Op (OP_GetElementPtr t (ptrtyp, ptrval) idxs) =>
-        do vptr <- eval_expr e (Some ptrtyp) ptrval;
-        do vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret v) idxs;
-        match vptr with
-        | DVALUE_Addr a => Obs (Eff (GEP t a vs (fun (a:dvalue) => (pc_next, add_env id a e, k))))
-        | _ => t_raise "ERROR: GEP got non-pointer value" 
-        end
-
-      (* Note: Casts currently assume a 64-bit memory model *)
-      | IId id, INSTR_Op (OP_Conversion Inttoptr (TYPE_I 64) op (TYPE_Pointer t)) =>
-        do iv <- eval_expr e (Some (TYPE_I 64)) op;
-        match iv with
-        | DVALUE_I64 i => Obs (Eff (ItoP t i (fun (a:dvalue) => (pc_next, add_env id a e, k))))
-        | _ => t_raise "ERROR: Inttoptr got non-integer value" 
-        end
-
-      | IId id, INSTR_Op (OP_Conversion Ptrtoint (TYPE_Pointer t) ptrval (TYPE_I 64)) =>
-        do vptr <- eval_expr e (Some (TYPE_Pointer t)) ptrval;
-        match vptr with
-        | DVALUE_Addr a => Obs (Eff (PtoI t a (fun (a:dvalue) => (pc_next, add_env id a e, k))))
-        | _ => t_raise "ERROR: Ptrtoint got non-pointer value" 
-        end
-          
-
-                         
-      (* Handle the operations that _don't_ interact with the memory model *)
       | IId id, INSTR_Op op =>
-        do dv <- eval_op e op;     
+        do dv <- eval_op e None op;     
           Step (pc_next, add_env id dv e, k)
 
       | IId id, INSTR_Alloca t _ _ =>
         Obs (Eff (Alloca t (fun (a:value) =>  (pc_next, add_env id a e, k))))
                 
       | IId id, INSTR_Load _ t (u,ptr) _ =>
-        do dv <- eval_expr e (Some u) ptr;     
+        do dv <- eval_op e (Some u) ptr;     
           match dv with
-          | DVALUE_Addr a => Obs (Eff (Load t a (fun dv => (pc_next, add_env id dv e, k))))
+          | DVALUE_Addr a => Obs (Eff (Load a (fun dv => (pc_next, add_env id dv e, k))))
           | _ => t_raise "ERROR: Load got non-pointer value" 
           end
             
       | IVoid _, INSTR_Store _ (t, val) (u, ptr) _ => 
-        do dv <- eval_expr e (Some t) val; (* TO SEE: Added new function *)
+        do dv <- eval_op e (Some t) val; (* TO SEE: Added new function *)
           (* CHKoh: do dv <- eval_op e val; *)
-          do v <- eval_expr e (Some u) ptr;
+          do v <- eval_op e (Some u) ptr;
           match v with 
           | DVALUE_Addr a => Obs (Eff (Store a dv (fun _ => (pc_next, e, k))))
           |  _ => t_raise "ERROR: Store got non-pointer value" 
@@ -1052,63 +941,17 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
 
       | _, INSTR_Store _ _ _ _ => t_raise "ERROR: Store to non-void ID" 
             
+      (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
       | pt, INSTR_Call (ret_ty, ID_Global fid) args =>
-        (* evaluate the function arguments *)
-        do dvs <-  map_monad (fun '(t, op) => (eval_expr e (Some t) op)) args;
-        match pt, ret_ty with
-            
-        | IVoid _, TYPE_Void =>
-          (* void function call *)
-          match (find_function_entry CFG fid) with
-          | Some fnentry =>
-            let 'FunctionEntry ids pc_f := fnentry in
-            do bs <- combine_lists_err ids dvs;
-            let env := env_of_assoc bs in
-            Step (pc_f, env, (KRet_void e pc_next::k))
-
-          | None =>
-          (* TODO: look up fid in the global environment to see if it is a legitimate
-             external call.  If not, then this is an error.  If so, then it is 
-             an observable effect. For now, allow Name to be used as a call. *)
-            (* The continuation of a void call ignores the returned value -- 
-               the handler for the call should pass DVALUE_None. *)
-            match fid with
-            | Ollvm_ast.Name s => Obs (Eff (Call TYPE_Void s dvs (fun dv => (pc_next, e, k))))
-            | _ => t_raise ("stepD: no function " ++ (string_of fid))
-            end
-
-          end
-
-        | _, TYPE_Void => t_raise "Call mismatch void function called with id"
-
-                                 
-        | IId id, t =>
-          match (find_function_entry CFG fid) with
-          | Some fnentry =>
-            let 'FunctionEntry ids pc_f := fnentry in
-            do bs <- combine_lists_err ids dvs;
-            let env := env_of_assoc bs in
-            Step (pc_f, env, (KRet e id pc_next::k))
-
-          | None =>
-            (* TODO: look up fid in the global environment to see if it is a legitimate
-             external call.  If not, then this is an error.  If so, then it is 
-             an observable effect. For now, allow Name to be used as a call. *)
-            (* The continuation of a non-void call binds the returned value in the
-               local environment
-             *)
-            match fid with
-            | Ollvm_ast.Name s => Obs (Eff (Call t s dvs (fun dv => (pc_next, add_env id dv e, k))))
-            | _ => t_raise ("stepD: no function " ++ (string_of fid))
-            end
-
-          end
-
-        | _, _ => t_raise ("stepD: type mismatch: non-void function called as void")
-            
-        end
-
-      (* NOTE : this is where we need to handle function pointers *)
+        do fnentry <- trywith ("stepD: no function " ++ (string_of fid)) (find_function_entry CFG fid); 
+        let 'FunctionEntry ids pc_f := fnentry in
+        do dvs <-  map_monad (fun '(t, op) => (eval_op e (Some t) op)) args;
+          match pt, ret_ty with
+              | IVoid _, TYPE_Void => Step (pc_f, combine ids dvs, (KRet_void e pc_next::k))
+              | IId id, _ =>          Step (pc_f, combine ids dvs, (KRet e id pc_next::k))
+              | _, _ => t_raise "Call mismatch void/non-void"
+          end        
+                
       | _, INSTR_Call (_, ID_Local _) _ => t_raise "INSTR_Call to local"
 
       | _, INSTR_Unreachable => t_raise "IMPOSSIBLE: unreachable" 
@@ -1132,7 +975,7 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
 Definition init_state (CFG:mcfg) (fname:string) : err state :=
   'fentry <- trywith ("INIT: no function named " ++ fname) (find_function_entry CFG (Name fname));
   let 'FunctionEntry ids pc_f := fentry in
-    mret (pc_f, (@ENV.empty value), []).
+    mret (pc_f, [], []).
 
 (* Note: codomain is D'  *)
 CoFixpoint step_sem (CFG:mcfg) (s:state) : Trace state :=
@@ -1153,7 +996,7 @@ Section Properties.
   Proof.
     intros id dv e.  unfold lookup_env. 
     unfold add_env.
-    apply ENV.find_1. apply ENV.add_1. reflexivity.
+    rewrite Util.assoc_hd. reflexivity.
   Qed.  
 
   Lemma lookup_env_tl : forall id1 v1 e id2,
@@ -1162,39 +1005,28 @@ Section Properties.
     unfold lookup_env.
     intros id1 v1 e id2 H.
     unfold add_env. 
-    remember (ENV.find (elt:=value) id2 (ENV.add id1 v1 e)) as x.
-    remember (ENV.find (elt:=value) id2 e) as y.
-    destruct x; destruct y; auto.
-    - symmetry in Heqx. rewrite <- ENVFacts.find_mapsto_iff in Heqx.
-      symmetry in Heqy. rewrite <- ENVFacts.find_mapsto_iff in Heqy.
-      rewrite ENVFacts.add_neq_mapsto_iff in Heqx; auto.
-      assert (v = v0). { eapply ENVFacts.MapsTo_fun; eauto. }
-                       subst; reflexivity.                 
-    - symmetry in Heqx. rewrite <- ENVFacts.find_mapsto_iff in Heqx.
-      symmetry in Heqy. rewrite <- ENVFacts.not_find_in_iff in Heqy.
-      rewrite ENVFacts.add_neq_mapsto_iff in Heqx; auto.
-      unfold ENV.In in Heqy. unfold ENV.Raw.In0 in Heqy. assert False. apply Heqy. exists v. apply Heqx. destruct H0.
-    - symmetry in Heqx. rewrite <- ENVFacts.not_find_in_iff in Heqx.
-      symmetry in Heqy. rewrite <- ENVFacts.find_mapsto_iff in Heqy.
-      assert False. apply Heqx. unfold ENV.In.  unfold ENV.Raw.In0. exists v. apply ENV.add_2; auto. destruct H0.
+    rewrite Util.assoc_tl; auto.
   Qed.  
 
 
   Lemma lookup_add_env_inv :
     forall id1 v e id2 u
       (Hl: lookup_env (add_env id1 v e) id2 = Some u),
-      (id1 = id2 /\ v = u) \/ (id1 <> id2 /\ lookup_env e id2 = Some u).
+      (id1 = id2 /\ v = u) \/ (lookup_env e id2 = Some u).
   Proof.
     intros id1 v e id2 u Hl.
     unfold add_env in Hl.
-    unfold lookup_env in *.
-    rewrite <- ENVFacts.find_mapsto_iff in Hl.
-    apply ENVFacts.add_mapsto_iff in Hl.
-    destruct Hl as [H | H].
-    - left. assumption.
-    - right. rewrite <- ENVFacts.find_mapsto_iff. assumption.
-  Qed.      
-    
+    unfold lookup_env in Hl.
+    remember (Util.assoc RawID.eq_dec id2 ((id1, v)::e)) as res.
+    destruct res; simpl in Hl; try solve [inversion Hl].
+    symmetry in Heqres.
+    apply Util.assoc_cons_inv in Heqres.
+    destruct Heqres as [[H1 H2]|[H1 H2]]. subst; auto.
+    (* destruct (@Util.assoc_cons_inv raw_id value id2 id1 v v0 e RawID.eq_dec)  *)
+    inversion Hl. tauto. 
+    right. inversion Hl. subst. unfold lookup_env. exact H2.
+  Qed.
+
   Definition pc_satisfies (CFG:mcfg) (p:pc) (P:cmd -> Prop) : Prop :=
     forall cmd, fetch CFG p = Some cmd -> P cmd.
 
@@ -1239,7 +1071,6 @@ Section Properties.
       (Hstep: stepD CFG (pc1, e1, k1) = Step (pc2, e2, k2)),
       incr_pc CFG pc1 = Some pc2.
   Proof.
-    (*
     intros CFG pc1 e1 k1 pc2 e2 k2 Hpc Hstep.
     simpl in Hstep.
     unfold pc_non_call in Hpc. unfold pc_satisfies in Hpc.
@@ -1247,9 +1078,8 @@ Section Properties.
     specialize Hpc with (cmd0 := c). destruct Hpc as [i [Hi Hc]]; auto.
     subst.
     destruct (incr_pc CFG pc1); [simpl in Hstep | solve [inversion Hstep]].
-    stepD_destruct.*)
-    admit. (* TODO: fix up once the effects interface is stabilized *)
-  Admitted.
+    stepD_destruct.
+  Qed.    
 
 End Properties.
 
