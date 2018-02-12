@@ -848,7 +848,6 @@ Definition eval_op_for_store (e:env) (t:typ) (o:Ollvm_ast.value)
     | TYPE_I 1, VALUE_Integer i => mret (DVALUE_I1 (Int1.repr i))
     | TYPE_I 32, VALUE_Integer i => mret (DVALUE_I32 (Int32.repr i))
     | TYPE_I 64, VALUE_Integer i => mret (DVALUE_I64 (Int64.repr i))
-
     | _, OP_IBinop _ _ _ _
     | _, OP_ICmp _ _ _ _
     | _, OP_FBinop _ _ _ _ _
@@ -865,14 +864,12 @@ Definition eval_op_for_store (e:env) (t:typ) (o:Ollvm_ast.value)
     | _, _ => eval_op e (Some t) o
     end
   end.
-
 Definition eval_cond (e:env) (o:Ollvm_ast.value) : err value :=
   match o with
   | SV o' =>
     match o' with
     | VALUE_Bool true => mret (DVALUE_I1 (Int1.one))
     | VALUE_Bool false => mret (DVALUE_I1 (Int1.zero))
-
     | OP_IBinop _ _ _ _
     | OP_ICmp _ _ _ _
     | OP_FBinop _ _ _ _ _
@@ -885,7 +882,6 @@ Definition eval_cond (e:env) (o:Ollvm_ast.value) : err value :=
     | OP_ExtractValue _ _
     | OP_InsertValue _ _ _
     | OP_Select _ _ _ => failwith "invalid conditional"
-
     | _ => eval_op e None o
     end
   end.
@@ -910,24 +906,7 @@ Fixpoint jump (CFG:cfg) (from:block_id) (e_init:env) (e:env) (to:block) (k:stack
   end.
 *)
 
-Locate find_block_entry.
-Definition test iid e e_init t ls bid_src :=
-      match assoc RawID.eq_dec bid_src ls with
-      | Some op =>
-        'dv <- eval_op e_init (Some t) op;
-          mret (add_env iid dv e)
-      | None => failwith ("jump: block " ++ string_of bid_src ++ " not found in " ++ string_of iid)
-      end.
-Print test. Print monad_fold_right.
 
-
-
-
-
-
-
-
-Print RawID.eq_dec.
 Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (e_init:env) (k:stack)  : err state :=
   let eval_phi (e:env) '(iid, Phi t ls) :=
       match assoc RawIDOrd.eq_dec bid_src ls with
