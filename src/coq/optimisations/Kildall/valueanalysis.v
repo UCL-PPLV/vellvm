@@ -43,32 +43,30 @@ Module NodeSetForward <: NODE_SET.
     end.
 
   
-  Definition code_to_pc (fn:function_id) (bk:block_id) (i:instr_id*instr) : pc := mk_pc fn bk (fst i).
-  Definition map_code fn bk (c:code) : seq pc := map (code_to_pc fn bk) c.
-  Definition block_to_pc fn (b:block) := map_code fn (blk_id b) (blk_code b) ++ (cons (mk_pc fn (blk_id b) (blk_term_id b)) nil).
-
+  Definition code_to_pc  (bk:block_id) (i:instr_id*instr) : local_pc := mk_localpc bk (fst i).
+  Definition map_code bk (c:code) : seq local_pc := map (code_to_pc bk) c.
+  Definition block_to_pc (b:block) := map_code (blk_id b) (blk_code b) ++ (cons (mk_localpc (blk_id b) (blk_term_id b)) nil).
+  Definition cfg_to_pc  (c:cfg) := flatten (map (block_to_pc) (blks c)).
 
   
-Lemma all_node_block : forall code fn n instr,  block_to_cmd code n = Some instr -> In (mk_pc fn (blk_id code) n) (block_to_pc fn code).
-Proof. intros. destruct code. simpl in *. unfold block_to_pc. simpl in *. unfold block_to_cmd in *. simpl in *. unfold blk_term_id in *. simpl in *. destruct blk_term. simpl in *.
-       destruct ( decide (i = n)). simpl in *. simpl in *. subst. induction blk_code. simpl in *. eauto. simpl in *. right. eauto. induction blk_code. simpl in *. inversion H. simpl in *. simpl in *. destruct a. simpl in *. destruct (decide (n = i0)). simpl in *. unfold code_to_pc. simpl in *. subst. left. eauto. right. eapply IHblk_code; eauto. Qed.
+Lemma all_node_block : forall code n instr,  block_to_cmd code n = Some instr -> In (mk_localpc (blk_id code) n) (block_to_pc code).
+Proof. intros. destruct code. simpl in *. unfold block_to_pc. simpl in *. unfold block_to_cmd in *.
+       simpl in *. unfold blk_term_id in *. simpl in *. destruct blk_term. simpl in *.
+       destruct ( decide (i = n)). subst. induction blk_code.
+       simpl in *. eauto. simpl in *. right. eauto. induction blk_code. simpl in *.
+       inversion H. simpl in *. simpl in *. destruct a.
+       destruct (decide (n = i0)). unfold code_to_pc. simpl in *. subst. left. eauto.
+       right. eapply IHblk_code; eauto. Qed.
+
+
+
+
+Definition all_nodes (code: cfg) : list local_pc := cfg_to_pc code.
 
 
 
 
 
-Definition cfg_to_pc fn (c:cfg) := flatten (map (block_to_pc fn) (blks c)).
-Definition def_cfg_to_pc (d:definition cfg) := cfg_to_pc (dc_name (df_prototype d)) (df_instrs d).
-
-
-
-
-
-
-  Definition mcfg_to_pc (m:mcfg) := flatten (map def_cfg_to_pc (m_definitions m)).  
-
-
-Definition all_nodes (code: cfg) : list local_pc := nil.
   Definition In (p:local_pc) (l:t) := In p l.
   Lemma empty_spec:
     forall n, ~In n empty.
@@ -91,13 +89,34 @@ Proof.
 Proof.
   intros until s'. induction s. simpl in *. intros. split. inversion H. inversion H. simpl in *. intros. inversion H. subst. split. intros. eauto. simpl in *. intros. eauto. Qed.
 
+Lemma In_helper'' : forall A (B:seq local_pc) C, In A B ->  In A (B ++ C).
+Proof. intros. induction B. simpl in *. inversion H. simpl in *. inversion H. subst; eauto.
+       right. eauto. Qed.
+Hint Resolve In_helper''.
+
+Lemma In_helper' : forall A (B:seq local_pc) (C: seq local_pc), In A (B ++ C) <-> In A B \/ In A C.
+Proof. intros; split; intros.
+       +induction B. simpl in *. right. eauto. simpl in *. inversion H. subst. left. left. eauto.
+       eapply IHB in H0. inversion H0. left. right. eauto. right. eauto.
+       +inversion H. eapply In_helper''. eauto. induction B. simpl in *. eauto. simpl in *.  right. eapply IHB. right. eauto. Qed.
+        
 Lemma all_nodes_spec:
     forall code n instr,
     local_cfg.fetch code n = Some instr -> In n (all_nodes code).
-Proof.
+Proof. intros. destruct code. simpl in *. unfold fetch in *. unfold cfg_to_cmd in *.
+       simpl in *. destruct n. simpl in *. induction blks. simpl in *. inversion H.
+
+(* block_to_cmd code n = Some instr -> In (mk_localpc (blk_id code) n) (block_to_pc code).*)
+simpl in *. destruct (decide (blk_id a = lbk)). subst. simpl in *.
+remember (block_to_cmd a lpt). symmetry in Heqo. destruct o.
+eapply all_node_block in Heqo. simpl in *. unfold all_nodes. unfold cfg_to_pc. simpl in *.
+eapply In_helper'. left. eauto. inversion H.
 
 
-Admitted.
+
+unfold all_nodes in *. unfold cfg_to_pc in *. simpl in *.
+apply In_helper'. right. eapply IHblks. destruct blks; simpl in *; eauto. Qed.
+
 
 End NodeSetForward.
 

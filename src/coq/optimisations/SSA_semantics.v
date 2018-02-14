@@ -93,18 +93,6 @@ Proof. induction l2. intros. simpl in *. destruct l3. eauto. inversion H.
 
 
 
-(*                 compare_length (df_args d0) args0 ->
-                 compare_length args0 l ->
-                  compare_length args l0 -> 
-
-                 combine (df_args d0) l = combine (df_args d0) l0 -> l = l0
-
- *)
-
-
-
-
-
 Definition wf_call_instr (m:mcfg) := forall p fn func args t,
   fetch m p = Some (CFG.Step (INSTR_Call t args)) -> snd t = ID_Global fn ->
   find_function m fn = Some func -> compare_length (df_args func) args.

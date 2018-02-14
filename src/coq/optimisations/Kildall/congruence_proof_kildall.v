@@ -117,10 +117,13 @@ unfold exec_code1 in wf_program. simpl in *.
 rewrite  find_function_entry_unaffected_V1.
 inv sstate.
 unfold individual_step in *; simpl in *.
+(*IId ID instructions*)
 
 destruct ( o {| fn := fn; bk := bk; pt := IId id |} m (IId id, i)), i; simpl in *; eauto; unfold  lift_err_d; repeat (break_goal); try inv wf_program; try constructor; try right; try eapply CIH; intros; eauto.
-destruct op0.
 
+
+(*OP*)
+destruct op0.
 eapply sound_succ_state; eauto; unfold successor_pc; unfold transfer'; unfold CFG.fetch; unfold fetch; unfold cfg_to_cmd; unfold pc_to_local_pc; simpl in *; try rewrite Heqo0; try rewrite Heqo1; try rewrite Heqo2; simpl in *; eauto; eapply ematch_update; eauto.
 
 
@@ -258,7 +261,7 @@ eapply sound_succ_state; simpl in *; eauto; unfold transfer', CFG.fetch, success
 
 
 
-
+(*TERMINATOR INSTRUCTIONS*)
 
 
 rewrite jump_unaffected_v1.

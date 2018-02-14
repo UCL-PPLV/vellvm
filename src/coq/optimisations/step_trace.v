@@ -2,7 +2,6 @@ Require Import ZArith List String Omega.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellvm.CFG.
 Require Import Vellvm.optimisations.transform.
 Require Import Vellvm.optimisations.paco_util.
-Require Import Vellvm.optimisations.optimisation_stepsem.
 Require Import Vellvm.DecidableEquality.
 Require Import paco.
 Require Import Vellvm.Memory.

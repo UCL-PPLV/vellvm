@@ -3,7 +3,6 @@ Require Import Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellvm
 Require Import Vellvm.optimisations.transform.
 Require Import Vellvm.optimisations.paco_util.
 Require Import Vellvm.optimisations.step_trace.
-Require Import Vellvm.optimisations.EqNat.
 Require Import Vellvm.optimisations.SSA_semantics.
 
 Require Import Vellvm.DecidableEquality.

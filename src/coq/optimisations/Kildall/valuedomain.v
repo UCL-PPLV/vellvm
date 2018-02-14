@@ -7,6 +7,7 @@ Require Import Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellvm
 Require Import Vellvm.optimisations.transform.
 Require Import Vellvm.optimisations.paco_util.
 Require Import Vellvm.optimisations.step_trace.
+Require Import Vellvm.optimisations.vellvm_tactics.
 
 Require Import Vellvm.DecidableEquality.
 Require Import Vellvm.DecidableProp.
@@ -96,7 +97,6 @@ Lemma eq_trans: forall x y z, eq x y -> eq y z -> eq x z.
     Proof. intros. destruct x; simpl in *; eauto. Qed.
     
 
-Print aval.
     Definition lub (a b: aval) :=
       match a, b with
       | vbot, _ => b
@@ -154,8 +154,9 @@ destruct x. simpl in *. eauto. simpl in *. apply AE.eq_refl. Qed.
 
   Lemma eq_trans: forall x y z, eq x y -> eq y z -> eq x z.
 Proof.
-Admitted.
-
+    destruct x, y, z; simpl; try tauto. 
+    eapply AE.eq_trans; eauto.
+Qed.
 
 Definition beq (x y: t) : bool :=
     match x, y with
@@ -165,8 +166,14 @@ Definition beq (x y: t) : bool :=
     end.
 
   Lemma beq_correct: forall x y, beq x y = true -> eq x y.
-Proof. Admitted.
-
+Proof. 
+    destruct x, y; simpl; intros.
+    auto.
+    congruence.
+    congruence.
+    apply AE.beq_correct; auto.
+Qed.
+    
   Definition ge (x y: t) : Prop :=
     match x, y with
     | _, Bot => True
@@ -175,19 +182,20 @@ Proof. Admitted.
     end.
 
   Lemma ge_refl: forall x y, eq x y -> ge x y.
-Proof.
-Admitted.
+  Proof.
+        destruct x, y; simpl; try tauto. intros.
+    apply AE.ge_refl; auto.
+Qed.
 
 Lemma ge_trans: forall x y z, ge x y -> ge y z -> ge x z.
 Proof.
-Admitted.
-
+    destruct x, y, z; simpl; try tauto. eapply AE.ge_trans.
+Qed.
 
   Definition bot : t := Bot.
   Lemma ge_bot: forall x, ge x bot.
 Proof.
-Admitted.
-
+destruct x; simpl in *; eauto. Qed.
 
 Definition lub (x y: t) : t :=
     match x, y with
@@ -198,12 +206,22 @@ Definition lub (x y: t) : t :=
 
   Lemma ge_lub_left: forall x y, ge (lub x y) x.
 Proof.
-Admitted.
+    destruct x, y.
+    apply ge_refl; apply eq_refl.
+    simpl. auto.
+    apply ge_refl; apply eq_refl.
+    simpl.  apply AE.ge_lub_left. Qed.
 
 
 Lemma ge_lub_right: forall x y, ge (lub x y) y.
 Proof.
-Admitted.
+
+      destruct x, y.
+    apply ge_refl; apply eq_refl.
+    apply ge_refl; apply eq_refl.
+    simpl. auto.
+    simpl. apply AE.ge_lub_right. 
+  Qed.
 
 End VA.
 
@@ -249,11 +267,18 @@ Lemma ematch_ge:
   forall  e ae1 ae2,
   ematch e ae1 -> AE.ge ae2 ae1 -> ematch e ae2.
 Proof. intros. unfold ematch in *. intros. unfold AE.ge in *. specialize (H p).
-       specialize (H0 p). unfold AVal.ge in *. simpl in *. destruct ((lookup_env_aenv e p)); eauto. eapply vmatch_ge; eauto. destruct ( AE.get p ae2); simpl in *; eauto. destruct ( AE.get p ae1); eauto. apply vge_bot. inversion H0. inversion H0. destruct (AE.get p ae1). constructor. constructor. destruct (decide (n = n0)). subst; eauto. simpl in *. inversion H0. inversion H0.
-destruct (AE.get p ae1). constructor. constructor. constructor.
-destruct (AE.get p ae1), ( AE.get p ae2); eauto; inversion H; inversion H0; subst. constructor.
-destruct (decide (n1 = n)). subst. eauto. simpl in *. inversion H5. constructor. 
-destruct ( AE.get p ae2), (AE.get p ae1); try constructor; eauto; try inversion H0; inversion H. Qed.
+       specialize (H0 p). unfold AVal.ge in *. simpl in *.
+       destruct ((lookup_env_aenv e p)); eauto. eapply vmatch_ge; eauto.
+       destruct ( AE.get p ae2); simpl in *; eauto.
+       destruct ( AE.get p ae1); eauto. apply vge_bot.
+       inversion H0. inversion H0. destruct (AE.get p ae1).
+       constructor. constructor. destruct (decide (n = n0)).
+       subst; eauto. simpl in *. inversion H0. inversion H0.
+       destruct (AE.get p ae1). constructor. constructor. constructor.
+       destruct (AE.get p ae1), ( AE.get p ae2); eauto; inversion H; inversion H0; subst.
+       constructor. destruct (decide (n1 = n)). subst. eauto.
+       simpl in *. inversion H5. constructor.
+       destruct ( AE.get p ae2), (AE.get p ae1); try constructor; eauto; try inversion H0; inversion H. Qed.
 
 
 
@@ -283,4 +308,9 @@ unfold lookup_env_aenv, add_env, lookup_env in *; simpl in *.
 destruct (AstLib.RawID.eq_dec p r), (loc_id_eq p r); subst; eauto; try contradiction n; eauto.
 Qed.
 
+
+
+
+Lemma ematch_update_top : forall r v e ae, ematch e ae -> ematch (add_env r v e) (AE.set r vtop ae).
+Proof. intros. eapply ematch_update; eauto. constructor. Qed.
 
