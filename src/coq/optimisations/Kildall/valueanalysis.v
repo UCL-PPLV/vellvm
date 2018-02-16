@@ -124,38 +124,6 @@ Module DS := Dataflow_Solver(VA)(NodeSetForward).
 
 
 
-Definition transfer' (m:cfg) (p:local_pc) (a:aenv) : VA.t :=
-  match local_cfg.fetch m p with
-  | Some (Term (TERM_Br _ _ _)) => VA.State (AE.Top_except nil)
-  | Some (Term (TERM_Br_1 _)) => VA.State (AE.Top_except nil)
-  | Some (CFG.Step (INSTR_Op (SV o))) => match (lpt p) with
-                                         | IId id => VA.State (AE.set id (eval_aenv_expr a o) a)
-                                         | _ => VA.State a
-                                         end
-    | Some _ => match (lpt p) with
-              | IId id => VA.State (AE.set id (vtop) a)
-
-              | _ => VA.State a
-              end
-                
-  | None => VA.State a
-  end.
-
-Print VA.t.
-Print VA.t'.
-
-Definition transfer (m:cfg) (p:local_pc) (v:VA.t)  : VA.t :=
-  match v with
-  | VA.Bot => VA.Bot
-  | VA.State ae => match transfer' m p ae with
-                   | VA.Bot => VA.Bot
-                   | VA.State ae' => VA.State ae'
-                   end
-                     
-  end.
-
-
-
 
 
 Fixpoint add_multiple_aenv (a:aenv) (l:seq (local_id)) :=
@@ -172,9 +140,38 @@ Proof.  induction l. simpl in *. intros. eauto.
 eapply ematch_update; eauto. constructor. Qed.
 
 
+Definition transfer' (m:cfg) (p:local_pc) (a:aenv) : VA.t :=
+  match local_cfg.fetch m p with
+  | Some (Term (TERM_Br _ _ _)) => VA.State (AE.Top_except nil)
+  | Some (Term (TERM_Br_1 br)) => match find_block (blks m) br with
+                                  | None => VA.State (AE.Top_except nil)
+                                  | Some bl => (VA.State(add_multiple_aenv a (map fst (blk_phis bl))))
+                                  end
+                                    
+  | Some (CFG.Step (INSTR_Op (SV o))) => match (lpt p) with
+                                         | IId id => VA.State (AE.set id (eval_aenv_expr a o) a)
+                                         | _ => VA.State a
+                                         end
+    | Some _ => match (lpt p) with
+              | IId id => VA.State (AE.set id (vtop) a)
+
+              | _ => VA.State a
+              end
+                
+  | None => VA.State a
+  end.
+
+Definition transfer (m:cfg) (p:local_pc) (v:VA.t)  : VA.t :=
+  match v with
+  | VA.Bot => VA.Bot
+  | VA.State ae => match transfer' m p ae with
+                   | VA.Bot => VA.Bot
+                   | VA.State ae' => VA.State ae'
+                   end
+                     
+  end.
 
 
-Print AE.Bot.
 
 Definition analyse (d:definition cfg) :   PCMap.t DS.L.t :=
   let c := df_instrs d in

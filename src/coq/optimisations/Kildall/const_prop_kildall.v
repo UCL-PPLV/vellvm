@@ -63,7 +63,7 @@ Definition optimise_val (ae:aenv) (o:Ollvm_ast.value)  (r:raw_id) :=
   | rest => rest 
   end.
 
-
+(*
 
 Ltac clean := simpl in *; unfold eval_expr; simpl in *; eauto.
 
@@ -92,12 +92,9 @@ Proof. intros.
 
 
        destruct e0; simpl in *; try destruct id0; simpl in *; eauto. destruct ( AE.get id0 a) eqn:?; simpl in *; eauto. destruct n;try  destruct e0; dupl Heqt; eapply ematch_get in Heqt; clean; try rewrite Heqt; clean.
-
-
-
-
-
-       destruct t; clean. destruct sz; clean. destruct p; clean. destruct p; clean. destruct p; clean. destruct p; clean. destruct p; clean .  destruct p; clean. clean. destruct v1. destruct e0; clean; try destruct id0; clean; try destruct (AE.get id0 a) eqn:?; try dupl Heqt; simpl in *; clean; try destruct v2; clean; try destruct e0; clean; try destruct id1; clean; try destruct ( AE.get id1 a) eqn:?; try dupl Heqt1;  clean; try eapply ematch_get in Heqt0; eauto; try rewrite Heqt0; try destruct n; clean; try destruct e0; clean; try eapply ematch_get in Heqt1; eauto; try rewrite Heqt1; clean; try rewrite Heqt0; clean; try destruct n0; clean; try rewrite Heqt1; clean; try destruct e0; clean; try rewrite Heqt1; clean; try destruct id0; clean; destruct ( AE.get id0 a) eqn:?; clean; try dupl Heqt; destruct n; try eapply ematch_get in Heqt; eauto; try rewrite Heqt; try destruct e0; clean; try rewrite Heqt; clean; try dupl Heqt0; try eapply ematch_get in Heqt0; eauto; rewrite Heqt0; clean. 
+       destruct t; clean. destruct sz; clean. destruct p; clean. destruct p; clean. destruct p; clean. destruct p; clean. destruct p; clean .  destruct p; clean. clean. destruct v1.
+       
+       destruct e0; clean; try destruct id0; clean; try destruct (AE.get id0 a) eqn:?; try dupl Heqt; simpl in *; clean; try destruct v2; clean; try destruct e0; clean; try destruct id1; clean; try destruct ( AE.get id1 a) eqn:?; try dupl Heqt1;  clean  ; try eapply ematch_get in Heqt0; eauto; try rewrite Heqt0; try destruct n; clean; try destruct e0; clean; try eapply ematch_get in Heqt1; eauto; try rewrite Heqt1; clean; try rewrite Heqt0; clean; try destruct n0; clean; try rewrite Heqt1; clean; try destruct e0; clean; try rewrite Heqt1; clean; try destruct id0; clean; destruct ( AE.get id0 a) eqn:?; clean; try dupl Heqt; destruct n; try eapply ematch_get in Heqt; eauto; try rewrite Heqt; try destruct e0; clean; try rewrite Heqt; clean; try dupl Heqt0; try eapply ematch_get in Heqt0; eauto; rewrite Heqt0; clean. 
 Qed.
 
 
@@ -109,7 +106,6 @@ Qed.
 Lemma eq_result_refl : forall a, eq_result a a.
 Proof. destr_eq a; try constructor. destr_eq e; try constructor. Qed.
 Hint Resolve eq_result_refl.
-Print fetch_analysis.
 
 
 Definition optimise_instr (ae: list (function_id * PCMap.t DS.L.t)) (p:pc) (m:mcfg) (i:instr_id * instr) : instr :=
@@ -128,9 +124,12 @@ Definition optimise_instr (ae: list (function_id * PCMap.t DS.L.t)) (p:pc) (m:mc
 
 
   Lemma const_prop  : forall m st mem (wf_program: wf_program m) (sstate: sound_state m st), trace_equiv (memD mem (sem m st)) (memD mem (sem (modul_opt (optimise_instr (analyse_program m)) m) st)).
-Proof. intros.  apply congruence_correct1; eauto.
+  Proof. intros.(* SearchAbout trace_equiv.
+
+         apply congruence_correct; eauto.
        
        unfold correct_instr1; intros; eauto.
        unfold optimise_instr; simpl in *. inv sstate0; simpl in *.
        rewrite AN.  destruct id; clean. destruct instr; clean.
        unfold exec_code1; simpl in *. unfold individual_step. simpl in *. eapply val_correct in EM. rewrite EM. eauto. Qed.
+*) Admitted.*)

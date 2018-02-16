@@ -16,105 +16,16 @@ Require Import Vellvm.Memory.
 Require Import Vellvm.Effects.
 Require Import Ascii.
 Require Import Equalities.
-Require Coq.MSets.MSetAVL.
 
 Local Unset Elimination Schemes.
 Local Unset Case Analysis Schemes.
 
 Set Implicit Arguments.
 
-Module PCTree1 (v:BooleanDecidableType) <: TREE1.
-    Definition elt := local_pc.
-  Definition elt_eq := local_pcDec.eq_dec.
-
-
-  Definition elt_eq_refl := @eq_refl elt.
-  Definition elt_eq_sym := @eq_sym elt.
-  Definition elt_eq_trans := @eq_trans elt.
-  Definition elt_eqb := Local_PCOrd.beq.
-
-
-  Lemma elt_eqb_eq : forall a b, elt_eqb a b = true <-> eq a b.
-  Proof. intros. eapply Local_PCOrd.beq_correct. Qed.
-
-
-  Definition val := v.t. Print BooleanDecidableType.
-  Definition val_eq := v.eq.
-  Definition val_eqb := v.eqb.
-  
-  Lemma val_eqb_eq : forall a b, val_eqb a b = true <-> v.eq a b.
-  Proof. eapply v.eqb_eq.  Qed.
-
-  Definition tree  := list (elt * val).
-  Definition t := tree.
-
-  Definition empty : list (elt * val) := nil.
-
-    Fixpoint get (i:local_pc) (m: t) : option val :=
-    match m with
-    | nil => None
-    | (key, item) :: tl => if (elt_eq key i) then Some item else get i tl
-    end.
-
-
-    Fixpoint set (i: local_pc) (v:val ) (m : t) : t :=
-    match m with
-    | nil => cons (i, v) nil
-    | (key, item) :: tl => if (elt_eq key i) then (key, v) :: tl  else (key, item) :: set i v tl
-    end.
-
-
-    Fixpoint remove (i : local_pc) (m : t) : t :=
-    match m with
-    | nil => nil
-    | (key, item) :: tl => if (elt_eq key i) then remove i tl else (key, item) :: remove i tl
-    end.
-
-  Theorem gempty :
-    forall  (i : local_pc), get i (empty) = None.
-  Proof. intros. simpl in *. eauto. Qed.
-  Hint Resolve gempty.
-
-  Theorem gss : forall (i : local_pc) (x : val) (m: t), get i (set i x m) = Some x.
-  Proof. induction m; simpl in *; eauto. destruct (elt_eq i i). eauto. contradiction n; eauto.
-         destruct a; simpl in *. destruct ( elt_eq e i). simpl in *. subst.
-         destruct (elt_eq i i). eauto. tauto. simpl in *. destruct ( elt_eq e i); subst; tauto.
-  Qed.
 
 
 
-  
-  Lemma gleaf : forall  (i : local_pc), get i (nil : t A) = None.
-  Proof. intros. simpl in *. eauto. Qed. Hint Resolve gleaf.
 
-
-  Theorem gso : forall (A : Type) (i j : local_pc) (x: A) (m : t A), i <> j -> get i (set j x m) = get i m.
-  Proof. intros. induction m; simpl in *. destruct (elt_eq j i). subst. contradiction H; eauto.
-eauto. destruct a.  simpl in * . destruct (elt_eq e j), (elt_eq e i); subst. contradiction H; eauto. simpl in *. destruct (elt_eq j i). subst. contradiction H; eauto. eauto. simpl in *.
-destruct (elt_eq i i). eauto. contradiction n0; eauto. simpl in *. destruct ( elt_eq e i). subst. contradiction n0; eauto. eauto.
-  Qed.
-Hint Resolve gso.
-  
-  Theorem gsspec : forall (A : Type) (i j: local_pc) (x : A) (m: t A), get i (set j x m) = if (elt_eq i j) then Some x else get i m.
-  Proof. intros. induction m; simpl in *; eauto.
-         destruct (elt_eq j i), (elt_eq i j); subst; auto; try contradiction n; eauto.
-         destruct a. destruct (elt_eq e j), ( elt_eq i j); subst; simpl in *. destruct ( elt_eq j j). eauto.
-         contradiction n; eauto. destruct ( elt_eq j i). subst. contradiction n; eauto. eauto.
-         destruct ( elt_eq e j); subst. contradiction n; eauto. eauto. rewrite IHm. eauto.
-          Qed.
- Hint Resolve gsspec.
-
-
-  Theorem gsident: forall (A: Type) (i: local_pc) (m: t A) (v: A), get i m = Some v -> set i v m = m.
-  Proof. intros. induction m; simpl in *.
-         +inversion H.
-         +simpl in *. destruct a. destruct (elt_eq e i); subst; eauto. eapply IHm in H. rewrite H. auto.
-
-
-
-  Qed. Hint Resolve gsident.
-
-End PCTree1.
 Module PCTree <: TREE.
   Definition elt := local_pc.
          

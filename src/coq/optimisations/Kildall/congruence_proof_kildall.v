@@ -1,4 +1,4 @@
-Require Import ZArith List String Omega.
+(*Require Import ZArith List String Omega.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.CFGProp Vellvm.CFG.
 Require Import Vellvm.optimisations.paco_util.
 Require Import Vellvm.optimisations.step_trace.
@@ -363,4 +363,4 @@ remember  ((fix
                end)). rewrite <- Heqp in Heqe0. destruct p. simpl in *. inv Heqe0. inv Heqe0.
 
 eapply sound_succ_state; eauto; unfold transfer', CFG.fetch, successor_pc, fetch, cfg_to_cmd, find_block_pc,  CFG.find_block_entry; simpl in *; try rewrite Heqo0; try rewrite Heqo1; try rewrite Heqo2; eauto.
-rewrite Heqo3. simpl in *. eauto. constructor. inv Heqe0. Qed.
+rewrite Heqo3. simpl in *. eauto. constructor. inv Heqe0. Qed.*)

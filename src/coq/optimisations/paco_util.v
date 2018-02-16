@@ -9,8 +9,6 @@ Require Import ssreflect ssrbool seq eqtype ssrnat.
 
 
 
-Print mcfg.
-
 Definition unroll (t:Trace ()) :=
 match t with
   | Vis a => Vis a
@@ -115,7 +113,6 @@ Definition test_stepD (t:transition state) :=
              end
                
     end.
-Print stepD.
 Lemma test_stepD_equiv : forall st t p,  stepD st p = t -> test_stepD t = true.
 Proof. intros. unfold test_stepD. unfold stepD in *. simpl in *. destruct p. destruct p. destruct ((fetch st p)); simpl in *. destruct ( (incr_pc st p)). destruct c; simpl in *. destruct p; simpl in *. subst. destruct pt. destruct i; simpl in *; eauto. destruct ( eval_op e None op); simpl in *; eauto. destruct fn0. destruct i; simpl in *; eauto. destruct  (find_function_entry st id0);  simpl in *; eauto. destruct f.  destruct ( map_monad (fun '(t0, op) => eval_op e (Some t0) op) args); simpl in *; eauto. destruct ptr. destruct    ( eval_op e (Some t0) v); simpl in *; eauto.
 destruct v0; simpl in *; eauto. destruct i; simpl in *; eauto. destruct fn0; simpl in *; eauto.
@@ -136,10 +133,6 @@ Hint Resolve test_stepD_equiv.
 
 
 Hint Resolve trace_refl2.
-
-Print Step.
-Print state.
-
 
 Definition generic_start D prog mem e s fn bk iid :=
   match

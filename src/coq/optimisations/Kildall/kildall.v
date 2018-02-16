@@ -36,7 +36,6 @@ Module Type NODE_SET.
 
 End NODE_SET.
 
-Print cmd.
 Section REACHABLE.
 Context (fetch: cfg -> local_pc -> option cmd) (code: cfg) (successors:  cfg -> local_pc -> list local_pc).
 
@@ -595,7 +594,3 @@ Qed.
 End Kildall.
 
 End Dataflow_Solver.
-
-
-Require Import Vellvm.CFG.
-Print mcfg.

@@ -1,7 +1,7 @@
 Require Import Vellvm.CFG.
 Require Import Vellvm.Ollvm_ast.
 Require Import Equalities.
-
+Require Import List.
 
 
 Record local_pc : Set := mk_localpc { lbk : block_id;  lpt : instr_id }.
@@ -51,6 +51,16 @@ Definition successor_local_pc (c:cfg) (p:local_pc) :=
   end.
 
 
+
+Definition predecessor_local_pc (c:cfg) (p:local_pc) : list local_pc := nil.
+
+
+
+Lemma make_predecessors_correct_2:
+  forall n code instr s,
+  fetch code n = Some instr -> In s (successor_local_pc code n) ->
+  exists l, predecessor_local_pc code s = l /\ In n l.
+Proof. Admitted.
 
 Module local_pcDec <: MiniDecidableType.
   Definition t := local_pc.

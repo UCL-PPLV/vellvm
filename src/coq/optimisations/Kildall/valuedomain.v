@@ -27,7 +27,6 @@ Inductive aval : Type :=
 
 
 
-Print SEMILATTICE_WITH_TOP.
 Module AVal <: SEMILATTICE_WITH_TOP.
 
   Definition t := aval.

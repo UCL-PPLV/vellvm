@@ -5,27 +5,28 @@ Require Import Coq.Arith.EqNat.
 Require Import Vellvm.optimisations.Kildall.kildall.
 Require Import Vellvm.optimisations.Kildall.lattice.
 Require Import Vellvm.optimisations.maps.
+Require Import Vellvm.optimisations.local_cfg.
+
 Set Implicit Arguments.
 
 
 
-(*
 
 Module Type BACKWARD_DATAFLOW_SOLVER.
 
   Declare Module L: SEMILATTICE.
 
-    Variable code: mcfg. (*MCFG*)
-    Variable fetch : mcfg -> pc -> option cmd. (*MCFG -> PC -> INSTR*)
+    Variable code: cfg. (*MCFG*)
+    Variable fetch : cfg -> local_pc -> option cmd. (*MCFG -> PC -> INSTR*)
 
   
   Parameter fixpoint:
-    forall (code: mcfg) (successors: pc -> list pc)
-           (transf: pc -> L.t -> L.t),
+    forall (code: cfg) (successors: local_pc -> list local_pc)
+           (transf: local_pc -> L.t -> L.t),
     option (PCMap.t L.t).
-
+Print fetch.
     Axiom fixpoint_solution:
-    forall (code: mcfg) successors transf res n instr s,
+    forall (code: cfg) successors transf res n instr s,
     fixpoint code successors transf = Some res ->
     fetch code n = Some instr -> In s (successors n) ->
     (forall n a, fetch code n = None -> L.eq (transf n a) L.bot) ->
@@ -33,20 +34,20 @@ Module Type BACKWARD_DATAFLOW_SOLVER.
 
 
       Parameter fixpoint_allnodes:
-    forall (code: mcfg) (successors: pc -> list pc)
-           (transf: pc -> L.t -> L.t),
+    forall (code: cfg) (successors: local_pc -> list local_pc)
+           (transf: local_pc -> L.t -> L.t),
     option (PCMap.t L.t).
 
-      
+     Print fixpoint_allnodes. 
   Axiom fixpoint_allnodes_solution:
-    forall (code: mcfg) successors transf res n instr s,
+    forall (code: cfg) successors transf res n instr s,
     fixpoint_allnodes code successors transf = Some res ->
     fetch code n = Some instr -> In s (successors n) ->
     L.ge res!!n (transf s res!!s).
 
 End BACKWARD_DATAFLOW_SOLVER.
 
-
+(*
 Module Backward_Dataflow_Solver (LAT: SEMILATTICE) (NS: NODE_SET):
                    BACKWARD_DATAFLOW_SOLVER with Module L := LAT.
 
@@ -114,29 +115,3 @@ Qed.
  *)*)
 
 
-
-Fixpoint foldr A B (f:A -> B -> B) (l:list A) (c: B) :=
-  match l with
-  | nil => c
-  | hd :: tl => f hd (foldr  f tl c)
-  end.
-
-
-Lemma equiv : forall (f:nat -> nat -> nat) (a:nat) (xs:nat) (ys:list nat), f xs (foldr f ys a) = foldr f (xs::ys) a.
-Proof. induction ys. simpl in *. eauto. simpl in *. eauto. Qed.
-
-
-
-
-
-
-Definition func (a:nat) (l: nat) : nat :=
-  if beq_nat a 0 then a + l else l.
-
-
-
-Lemma equiv1 : forall l c, foldr func l c = c.
-Proof. induction l. simpl in *. eauto. simpl in *. unfold func. simpl in *. destruct (PeanoNat.Nat.eqb a 0) eqn:?. symmetry in Heqb. eapply beq_nat_eq in Heqb. subst. simpl. eauto. eauto. Qed.
-
-
-Print incr_pc. 

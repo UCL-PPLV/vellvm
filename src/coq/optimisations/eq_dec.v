@@ -15,7 +15,6 @@ Import ListNotations.
 Set Implicit Arguments.
 
 
-Print OrderedType. 
 Instance eq_dec_int : eq_dec int := Z_eq_dec.
 Require Import Ascii.
 
@@ -338,7 +337,6 @@ Module InstrIDOrd <: OrderedType.
   Definition eq_trans := @eq_trans t.
 
   
-  Print instr_id.
   Definition beq (t1 t2:t) :=
     match t1, t2 with
     | IId i1, IId i2 => RawIDOrd.beq i1 i2
@@ -503,7 +501,6 @@ destruct (RawIDOrd.beq lbk lbk0) eqn:?; eauto. generalize wildcard'. intros. eap
     -eapply  eq_dec_instr_id.
     -eapply eq_dec_raw_id.
      Defined.
-Print compare.
 
 
       
