@@ -196,3 +196,112 @@ rewrite  Heqo2 in sstate_preserve. simpl in *.
 
 destruct t; simpl in *; eauto; unfold lift_err_d; simpl in *; repeat (break_goal); try inv sstate; try constructor; try right; try eapply CIH; intros; eauto.
 Qed.
+
+
+
+Require Import Vellvm.optimisations.Kildall.const_prop.
+Require Import Vellvm.optimisations.Kildall.valueanalysis.
+Require Import Vellvm.optimisations.Kildall.valuedomain.
+
+
+Lemma eq_result_refl : forall a, eq_result a a.
+Proof.  intros. destruct a; try constructor. destruct e; try constructor. Qed.
+Hint Resolve eq_result_refl. SearchAbout find_function_entry.
+
+Lemma  const_prop_equiv_instr : forall m, correct_instr sound_state (optimise_instr (analyse_program m)) m.
+Proof. intros. unfold correct_instr.
+
+       
+ intros. inv sstate. destruct s. simpl in *. destruct p. simpl in *. unfold exec_code1. simpl in *. rewrite fetch_helper_equiv. unfold fetch_helper. rewrite <- incr_pc_unaffected. unfold fetch, incr_pc; simpl in *. destruct p. destr_eq (find_function m fn). destr_eq (find_block (blks (df_instrs d)) bk).
+       
+       destr_eq ( block_to_cmd b pt). destr p. destr o. unfold optimise_instr; simpl in *.
+       destr c. destr pt.
+         rewrite find_function_entry_unaffected_V1.
+         unfold optimise_instr. simpl in *. rewrite AN. destr i0. rewrite <- val_correct; eauto. rewrite AN.
+         rewrite find_function_entry_unaffected_V1. destr i0. rewrite jump_unaffected_v1. destr t. destr c. destr t. destr v. destr (eval_op e (Some t) v). destr v0. destr (StepSemantics.Int1.eq x StepSemantics.Int1.one). rewrite jump_unaffected_v1; eauto. rewrite jump_unaffected_v1; eauto. rewrite jump_unaffected_v1; eauto. Qed.
+
+Hint Resolve const_prop_equiv_instr.
+
+
+
+
+Lemma sound_state_pres : forall mem0 mem1 m st0 st',  sound_state m st0 ->
+  exec_code1 mem0 m st0 = tauitem mem1 st' -> sound_state m st'.
+
+
+Proof. intros. inv H; simpl in *. destruct st0. destruct p. simpl in *. unfold exec_code1 in *. simpl in *. unfold fetch, incr_pc in *; simpl in *. destruct p; simpl in *. destr_eq (find_function m fn). destr_eq (find_block (blks (df_instrs d)) bk). destr_eq (block_to_cmd b pt). destr p; simpl in *. destr c. destr o. destr pt; destr i; simpl in *; inv H0; clear H0. destr_eq ( eval_op e None op); simpl in *; inv H2; clear H2.
+
+       destruct op.
+eapply sound_succ_state; simpl in *; eauto; unfold successor_pc, fetch, transfer',  local_cfg.fetch, local_cfg.cfg_to_cmd; simpl in *; try rewrite Heqo; try rewrite Heqo0; try rewrite Heqo1; simpl; eauto; eapply ematch_update; eauto.
+
+(*func ent*) admit.
+
+
+eapply sound_succ_state; eauto;  unfold successor_pc, fetch, transfer',  local_cfg.fetch, local_cfg.cfg_to_cmd; simpl in *; try rewrite Heqo; try rewrite Heqo0; try rewrite Heqo1; simpl in *; eauto; eapply ematch_update; try constructor; eauto.
+
+
+
+
+destruct ptr. destr_eq (eval_op e (Some t0) v); simpl in *; inv H2; clear H2. destr v0; simpl in *; inv H1; clear H1. eapply sound_succ_state; eauto;  unfold successor_pc, fetch, transfer',  local_cfg.fetch, local_cfg.cfg_to_cmd; simpl in *; try rewrite Heqo; try rewrite Heqo0; try rewrite Heqo1; simpl in *; eauto; eapply ematch_update; try constructor; eauto.
+
+admit.
+
+
+
+
+
+
+destr val. destr ptr. destr_eq ( eval_op e (Some t) v); destr_eq (eval_op e (Some t0) v0); simpl in *; inv H2; clear H2. destr v2; simpl in *; inv H1; clear H1.
+eapply sound_succ_state; eauto;  unfold successor_pc, fetch, transfer',  local_cfg.fetch, local_cfg.cfg_to_cmd; simpl in *; try rewrite Heqo; try rewrite Heqo0; try rewrite Heqo1; simpl in *; eauto; eapply ematch_update; try constructor; eauto.
+
+
+simpl in *. inversion H0.
+
+
+
+
+destr t. destr v. destr ( eval_op e (Some t) v); simpl in *; inv H0; clear H0. destr s; inv H2; clear H2. destr f; inv H1; clear H1.
+inv sstack. simpl in *. destruct q. simpl in *. destr_eq (find_function m fn0). destr_eq (find_block (blks (df_instrs d0)) bk0). destr_eq (block_to_cmd b0 (IId id)). simpl in *. destr p. destruct H2. destruct H0. destruct H0. inversion H0. subst. clear H0. destruct o0. simpl in *. inversion H1. subst. clear H1.  
+
+
+
+
+
+
+eapply sound_succ_state; eauto; unfold transfer',  local_cfg.fetch,  local_cfg.cfg_to_cmd, successor_pc, fetch; simpl in *; try rewrite Heqo2; try rewrite Heqo3; try rewrite Heqo4; eauto; simpl in *; eauto; eapply ematch_update. eauto. constructor. inv H1. destruct H2. destruct H0. destruct H0. inversion H0.  destruct H2. destruct H0. destruct H0. inversion H0.   destruct H2. destruct H0. destruct H0. inversion H0. 
+
+
+
+
+
+destr s; simpl in *; inv H0. destruct f; simpl in *; inv H0.
+
+
+
+inv sstack; simpl in *. destruct H4. destruct H1. destruct H1. destruct H1. destruct H3. destruct H4. destruct p. simpl in *. destr_eq ( find_function m fn0). destr_eq (find_block (blks (df_instrs d0)) bk0). destr_eq (block_to_cmd b0 (IVoid x1)). destruct p. inversion H4. subst. clear H4. destr_eq o0. simpl in *. subst. inversion H5. subst. clear H5. eapply sound_succ_state; eauto;
+                                                                                                                                                                                                                                                                                                                                                                  unfold transfer', fetch, successor_pc, local_cfg.fetch, local_cfg.cfg_to_cmd; simpl in *; try rewrite Heqo2; try rewrite Heqo3; try rewrite Heqo4; simpl; eauto. inv H5. inv H5. inv H5. inv H5.
+
+
+
+destruct v. destr_eq ( eval_op e (Some t) v); simpl in *; inv H0; clear H0. destruct v0; simpl in *; inv H2; clear H2. destr_eq (StepSemantics.Int1.eq x StepSemantics.Int1.one); simpl in *.
+
+
+
+
+
+Admitted.
+
+
+Hint Resolve sound_state_pres.
+
+
+
+
+
+
+
+
+  
+
+Lemma const_prop_equiv : forall mem m st (sstate:sound_state m st) (wf_prog: wf_program m), trace_equiv (memD mem (sem m st)) (memD mem (sem (modul_opt (optimise_instr (analyse_program m)) m) st)).
+  Proof. intros. eapply congruence_correct1; eauto. Qed.
