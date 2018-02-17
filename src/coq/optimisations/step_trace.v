@@ -13,20 +13,10 @@ Require Import ssreflect ssrbool seq eqtype ssrnat.
 
 Set Implicit Arguments.
 
-Print mcfg.
-Print Trace.
 Inductive finish_item X :=
   | tauitem : memory -> X -> finish_item X
   | visitem : memory -> Event (Trace X) -> finish_item X.
 
-Print Trace.
-
-Print Event.
-
-
-Print Event.
-
-Print mem_step.
 Definition head_of_trace (m:memory) (t:Trace state) : finish_item state :=
 match t with
   | Vis x => visitem m x
@@ -88,14 +78,6 @@ Definition CFG_step insn CFG s :=
       (* Error states *)                                     
       | _, _ => t_raise "ID / Instr mismatch void/non-void"
       end.
-
-
-
-Print code.
-
-Print CFG_step.
-Print Obs. 
-
 
 
 Inductive mini_trace :=
@@ -160,13 +142,6 @@ Proof. intros. inversion H; subst. inversion H3; subst. auto. Qed.
 
 
 
-Print incr_pc.
-
-(*s l -> option pc*)
-
-Print state.
-Print pc.
-Print block.
 Definition incr_pc_v1 (s:state) (t:instr_id) (c:code) : option pc :=
     let '(pc, e, k) := s in
     match c with
@@ -262,8 +237,6 @@ Definition compare_exec1 m m1 c c1 mem s t := compare_trace (exec_code1 m c t (t
 
 
 (*USEFUL LEMMAS*)
-
-Print mem.
 
 
 Lemma false_mem : forall (mem:memory) A, (mem ++ [:: A])%list = mem -> False.

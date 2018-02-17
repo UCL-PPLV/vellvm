@@ -21,25 +21,7 @@ Definition get_block (CFG:mcfg) fid bid :=
   mret blk
 .
 
-Fixpoint wf_phis (phis:seq (local_id * phi)) (bk:block_id) (e:env) :=
-  match phis with
-  | nil => true
-  | (l, Phi typ l2) :: tl => match assoc AstLib.RawID.eq_dec bk l2 with
-                             | Some op => match eval_op e (Some typ) op with
-                                          | inr _ => wf_phis tl bk e
-                                          | inl _ => false
-                                          end
-                                            
-                             | None => false                        
-                          end
-                            
-  end.
 
-
-
-Definition branch_correct (m:mcfg) := forall p e br phis n_pc,
-    fetch m p = Some (Term (TERM_Br_1 br)) -> find_block_entry m (fn p) br = Some (BlockEntry phis n_pc) ->
-    wf_phis phis (bk p) e.
 
 
 
@@ -97,5 +79,24 @@ Definition wf_call_instr (m:mcfg) := forall p fn func args t,
   fetch m p = Some (CFG.Step (INSTR_Call t args)) -> snd t = ID_Global fn ->
   find_function m fn = Some func -> compare_length (df_args func) args.
 
+
+
+Print terminator. 
+Definition wf_branch_phi (m:mcfg) := forall p fn bk b,
+    fetch m p = Some (Term (TERM_Br_1 bk)) -> get_block m fn bk = Some b.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Inductive wf_program (m:mcfg) : Prop :=
-  | wf_program_intro : forall (wf_call: wf_call_instr m)(buid: block_uid m) (bcor: branch_correct m), wf_program m.
+  | wf_program_intro : forall (wf_call: wf_call_instr m)(buid: block_uid m), wf_program m.

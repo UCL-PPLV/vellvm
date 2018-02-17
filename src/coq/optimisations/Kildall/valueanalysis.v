@@ -318,10 +318,6 @@ Definition successor_pc (m:mcfg) (p:pc) :=
   end.
 
 
-Print successor_local_pc.
-
-Print find_function. Print pc_to_local_pc.
-Print block.
 Lemma find_block_pc_equiv : forall d bk b, find_block (blks (df_instrs d)) bk = Some b -> (blk_id b) = bk.
 Proof. intros. destruct d. simpl in *. destruct df_instrs. simpl in *. induction blks. simpl in *. inversion H.
 simpl in *.  destruct ( decide (blk_id a = bk)). inversion H. subst. simpl in *. eauto. simpl in *. eapply IHblks.
@@ -455,3 +451,17 @@ econstructor; simpl; eauto. eapply fetch_analysis_equiv; eauto. Qed.
 
 
 
+
+(*Helper functions for proving preservation*)
+
+Require Import Vellvm.optimisations.SSA_semantics.
+
+
+
+
+Definition combine_phis (b:list (local_id * phi)) (e:env) (v:list value) := 
+  combine (map fst b) v ++ e.
+
+Lemma jump_phis_preserved : forall m f b_entry b_exit block (e:env) s t,  jump m f b_entry b_exit e s = inr t -> get_block m f b_exit = Some block ->
+                                                                          exists t, jump m f b_entry b_exit e s =  inr ((mk_pc f b_exit (fallthrough (blk_code block) (blk_entry_id block))), combine_phis (blk_phis block) e t, s) /\ compare_length (map fst (blk_phis block)) t.
+Proof. Admitted.

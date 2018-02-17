@@ -16,9 +16,6 @@ Require Import Vellvm.optimisations.vellvm_tactics.
 
 Require Import Vellvm.optimisations.Kildall.valueanalysis.
 Require Import Vellvm.optimisations.Kildall.valuedomain.
-Require Import Vellvm.optimisations.Kildall.congruence_proof_kildall.
-Require Import Vellvm.optimisations.Kildall.congruence_definition_kildall.
-
 Require Import compcert.lib.Integers.
 
 Open Scope Z_scope.
@@ -101,11 +98,6 @@ Qed.
 
 
 
-
-
-Lemma eq_result_refl : forall a, eq_result a a.
-Proof. destr_eq a; try constructor. destr_eq e; try constructor. Qed.
-Hint Resolve eq_result_refl.
 
 
 Definition optimise_instr (ae: list (function_id * PCMap.t DS.L.t)) (p:pc) (m:mcfg) (i:instr_id * instr) : instr :=
