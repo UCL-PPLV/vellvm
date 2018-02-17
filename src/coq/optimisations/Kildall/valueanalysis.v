@@ -27,7 +27,6 @@ From mathcomp.ssreflect
 
 Set Implicit Arguments.
 
-Print NODE_SET.
 Module NodeSetForward <: NODE_SET.
   Definition t := list local_pc.
   Definition empty := nil : list local_pc.
@@ -462,6 +461,97 @@ Require Import Vellvm.optimisations.SSA_semantics.
 Definition combine_phis (b:list (local_id * phi)) (e:env) (v:list value) := 
   combine (map fst b) v ++ e.
 
-Lemma jump_phis_preserved : forall m f b_entry b_exit block (e:env) s t,  jump m f b_entry b_exit e s = inr t -> get_block m f b_exit = Some block ->
-                                                                          exists t, jump m f b_entry b_exit e s =  inr ((mk_pc f b_exit (fallthrough (blk_code block) (blk_entry_id block))), combine_phis (blk_phis block) e t, s) /\ compare_length (map fst (blk_phis block)) t.
-Proof. Admitted.
+
+
+Definition jump_monad e phis b_entry :=  monad_fold_right
+            (fun (e0 : env) '(iid, Phi t1 ls) =>
+             match assoc RawID.eq_dec b_entry ls with
+             | Some op =>
+                 match eval_op e (Some t1) op with
+                 | inl x => inl x
+                 | inr a => inr (add_env iid a e0)
+                 end
+             | None =>
+                 failwith
+                   ("jump: block " ++ string_of b_entry ++ " not found in " ++ string_of iid)
+             end) phis e.
+
+
+Print jump_monad.
+
+
+
+Lemma jump_monad3 : forall phis e b_entry l, jump_monad e phis b_entry = inr l -> exists r, jump_monad e phis b_entry = inr ((combine (map fst phis) r) ++ e) /\ compare_length (map fst phis) r.
+Proof. induction phis; intros.
+       +unfold jump_monad; simpl in *. exists nil. eauto.
+       +unfold jump_monad; simpl in *; destruct a; destruct p; simpl in *.
+        destr_eq (assoc RawID.eq_dec b_entry args). destr_eq ( eval_op e (Some t) v).
+        *unfold jump_monad in H. simpl in *. rewrite Heqo in H. rewrite Heqe0 in H. unfold monad_fold_right in H. remember (  (fix
+         monad_fold_right (A B : Type) (M : Type -> Type) (H : Functor M) 
+                          (H0 : Monad) (f : A -> B -> M A) (l : seq B) 
+                          (a : A) {struct l} : M A :=
+           match l with
+           | [::] => mret a
+           | x :: xs => monad_fold_right A B M H H0 f xs a ≫= (fun y : A => f y x)
+           end)). rewrite <- Heqp in H. clear Heqp. destruct p; inv H.
+        *unfold jump_monad in H. simpl in *. remember ( monad_fold_right
+          (fun (e0 : env) '(iid, Phi t1 ls) =>
+           match assoc RawID.eq_dec b_entry ls with
+           | Some op =>
+               match eval_op e (Some t1) op with
+               | inl x => inl x
+               | inr a => inr (add_env iid a e0)
+               end
+           | None =>
+               failwith
+                 ("jump: block " ++
+                  string_of b_entry ++ " not found in " ++ string_of iid)
+           end) phis e). rewrite Heqs. destruct s. inv H. symmetry in Heqs. eapply IHphis in Heqs.
+         inversion Heqs; clear Heqs. destruct H0. unfold jump_monad in H0. rewrite H0. unfold add_env. simpl in *. exists (v0 :: x). simpl in *. split; eauto.
+        *unfold jump_monad in *. simpl in *. rewrite Heqo in H. unfold monad_fold_right in *. remember ((fix
+         monad_fold_right (A B : Type) (M : Type -> Type) (H : Functor M) 
+                          (H0 : Monad) (f : A -> B -> M A) (l : seq B) 
+                          (a : A) {struct l} : M A :=
+           match l with
+           | [::] => mret a
+           | x :: xs => monad_fold_right A B M H H0 f xs a ≫= (fun y : A => f y x)
+           end)). rewrite <- Heqp in H. destr p; inv H. Qed.
+  
+Definition jump_v1 CFG fid bid_src bid_tgt e k : err state :=
+  match CFG.find_block_entry CFG fid bid_tgt with
+  | Some (BlockEntry phis pc_entry) => match jump_monad e phis bid_src with
+                                       | inr a => inr (pc_entry, a, k)
+                                       | inl b => failwith b
+                                       end
+  |  None => failwith ("jump: target block " ++ string_of bid_tgt ++ " not found")
+  end.
+
+Lemma jump_v1_equiv : jump_v1 = jump.
+  Proof. repeat (apply functional_extensionality; intros). unfold jump_v1. unfold jump. simpl in *. 
+         destr_eq (CFG.find_block_entry x x0 x2). Qed.
+  
+
+  Lemma jump_phis_preserved : forall m f b_entry b_exit block (e:env) s t,
+      jump m f b_entry b_exit e s = inr t ->
+      get_block m f b_exit = Some block ->
+      exists t, jump m f b_entry b_exit e s =  inr ((mk_pc f b_exit (fallthrough (blk_code block) (blk_entry_id block))), combine_phis (blk_phis block) e t, s) /\
+                compare_length (map fst (blk_phis block)) t.
+
+
+
+
+   
+   Proof. rewrite <- jump_v1_equiv. intros. unfold jump_v1 in *. simpl in *.
+          unfold CFG.find_block_entry in *; simpl in *. destr_eq (find_function m f).
+          
+          destr_eq ( find_block (blks (df_instrs d)) b_exit). simpl in *. unfold get_block in *.
+          simpl in *. rewrite Heqo in H0.  rewrite Heqo0 in H0. inversion H0. subst.
+          eapply find_block_pc_equiv in Heqo0. subst. clear H0.
+          remember ( jump_monad e (blk_phis block) b_entry). destruct s0. inv H. inversion H.
+          subst. clear H. symmetry in Heqs0. dupl Heqs0. eapply  jump_monad3 in Heqs0.
+          inversion Heqs0; clear Heqs0. destruct H. unfold combine_phis. rewrite H in Heqs1.
+          inversion Heqs1. subst. clear Heqs1. unfold blk_entry_pc. simpl in *. exists x. split.
+          unfold fallthrough. unfold blk_entry_id. simpl in *. destruct block. simpl in *.
+          unfold blk_term_id in *. simpl in *. destruct blk_term. simpl in *. destruct blk_code.
+          simpl in *. eauto. simpl in *. eauto. eauto. inv H. inv H. Qed.
+
