@@ -15,7 +15,7 @@ CP=cp
 
 COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp
 OPTIMISATIONFILES := eq_dec local_cfg donothing map_spec maps paco_util SSA_semantics step_trace transform vellvm_tactics
-KILDALLFILES := lattice kildall valuedomain static_eval valueanalysis congruence_definition_kildall congruence_proof_kildall const_prop_kildall  general_congruence general_congruence_proof
+KILDALLFILES := lattice kildall valuedomain static_eval valueanalysis congruence_definition_kildall congruence_proof_kildall  const_prop general_congruence general_congruence_proof
 HEAPFILES := pred prelude idynamic ordtype domain finmap pcm unionmap heap spcm coding pperm 
 OLLVMFILES := 
 

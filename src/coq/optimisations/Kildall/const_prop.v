@@ -63,7 +63,7 @@ Definition optimise_val (ae:aenv) (o:Ollvm_ast.value)  (r:raw_id) :=
   | rest => rest 
   end.
 
-(*
+
 
 Ltac clean := simpl in *; unfold eval_expr; simpl in *; eauto.
 
@@ -120,7 +120,7 @@ Definition optimise_instr (ae: list (function_id * PCMap.t DS.L.t)) (p:pc) (m:mc
                      
   end.
 
-
+(*
 
 
   Lemma const_prop  : forall m st mem (wf_program: wf_program m) (sstate: sound_state m st), trace_equiv (memD mem (sem m st)) (memD mem (sem (modul_opt (optimise_instr (analyse_program m)) m) st)).
